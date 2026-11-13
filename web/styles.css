@@ -1408,3 +1408,11 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .profile-row .profile-chip { flex: 1; min-width: 0; }
 .lock-now { flex-shrink: 0; }
 .idle-setting { margin: 14px 0 16px; }
+
+/* Updates */
+.update-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 10px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); font-size: 14px; }
+.update-banner .grow { flex: 1; min-width: 0; }
+.update-notes { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.update-notes li.plain { list-style: none; margin-left: -20px; font-weight: 600; }
+.update-status p { margin: 0; }

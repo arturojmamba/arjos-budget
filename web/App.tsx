@@ -1,3 +1,4 @@
+import { UpdateBanner } from './components/Updates.tsx';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type Account, type Appearance, type Category, type Meta, type Profile } from './api.ts';
 import { AppContext } from './components/ui.tsx';
@@ -162,6 +163,7 @@ export function App() {
         </aside>
 
         <main className="main">
+          <UpdateBanner />
           <header className="topbar">
             <h1>{page.path === '/' && meta.profile.name ? greeting(meta.profile.name) : page.label}</h1>
             {showMonth && (

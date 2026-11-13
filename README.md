@@ -46,6 +46,8 @@ The same app as a normal desktop app: no Node, npm or Terminal needed.
 
 On a Mac, closing the window keeps the app running (so syncing carries on); quit with ⌘Q.
 
+**Updates (1.2 and later):** the app checks the GitHub releases when it opens and once a day, downloads a new version in the background and checks it against the SHA-256 GitHub publishes, then shows **Restart to update**. It backs up first, swaps the app in place (Mac: in Applications; Windows: a silent reinstall) and reopens; your data isn't touched. Settings → About & updates has *Check for updates* and a switch for automatic checks. If it can't update in place (for example it's running from the disk image), it says why and offers the installer.
+
 **Building it yourself:**
 ```bash
 npm install
@@ -53,7 +55,7 @@ npm run desktop        # run it from source in a window
 npm run desktop:mac    # → release/Ledger-<version>-mac-<arch>.dmg (needs a Mac)
 npm run desktop:win    # → release/Ledger-Setup-<version>.exe (needs Windows)
 ```
-GitHub builds both automatically: run **Actions → Desktop app → Run workflow**, or push a version tag (`git tag v1.0.1 && git push --tags`) to attach the installers to a release. Each build checks the packaged app starts before it's published.
+**Releasing:** bump `version` in package.json, then **Actions → Desktop app → Run workflow** with that version (e.g. `v1.2.1`) and optional notes (separated by `;`; otherwise the changes since the last release). Each build checks the packaged app starts before it's published, and after a release GitHub's Mac and Windows machines install the previous version and let it update itself to the new one.
 
 ## Run it from source
 

@@ -68,6 +68,14 @@ export interface DesktopHost {
   clearT212Key(): void;
   openDataFolder(): void;
   relaunch(): void;
+  /** Updates from the GitHub releases (installed app only). */
+  updates?: {
+    info(): unknown;
+    check(): Promise<unknown>;
+    install(): { ok: true } | { ok: false; reason: string };
+    setAuto(on: boolean): void;
+    openManual(): void;
+  };
   /** Touch ID on Macs that have it: unlock without typing the passcode. */
   touchId?: { available(): boolean; prompt(reason: string): Promise<boolean> };
 }
@@ -371,6 +379,29 @@ route('POST', '/api/t212/key', ({ db, body }) => {
 });
 route('DELETE', '/api/t212/key', () => { needDesktop().clearT212Key(); return { configured: trading212Config() !== null }; });
 route('POST', '/api/desktop/open-data', () => { needDesktop().openDataFolder(); return { ok: true }; });
+route('GET', '/api/desktop/update', () => {
+  const u = desktop?.updates;
+  return u ? { supported: true, ...(u.info() as object) } : { supported: false, version: desktop?.version ?? null };
+});
+route('POST', '/api/desktop/update/check', async () => {
+  const u = desktop?.updates;
+  if (!u) throw new ValidationError('Updates work in the desktop app');
+  return { supported: true, ...((await u.check()) as object) };
+});
+route('POST', '/api/desktop/update/install', () => {
+  const u = desktop?.updates;
+  if (!u) throw new ValidationError('Updates work in the desktop app');
+  const r = u.install();
+  if (!r.ok) throw new ValidationError(r.reason);
+  return { ok: true };
+});
+route('POST', '/api/desktop/update/open', () => { desktop?.updates?.openManual(); return { ok: true }; });
+route('PUT', '/api/desktop/update/auto', ({ body }) => {
+  const u = desktop?.updates;
+  if (!u) throw new ValidationError('Updates work in the desktop app');
+  u.setAuto(body?.on !== false);
+  return { supported: true, ...(u.info() as object) };
+});
 route('POST', '/api/desktop/relaunch', () => { const host = needDesktop(); setTimeout(() => host.relaunch(), 150); return { ok: true }; });
 route('GET', '/api/t212/status', ({ db }) => syncStatus(db, trading212Config()));
 route('POST', '/api/t212/sync', ({ db, body }) => { startSync(db, trading212Config(), {}, { force: body?.force === true }); return { ok: true }; });

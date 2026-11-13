@@ -4,7 +4,7 @@
  *
  * The passcode is never stored: only a salted scrypt hash, in lock.json next to the database.
  * It's kept out of the database on purpose, so backups and restores never carry an old passcode.
- * It also locks itself after a stretch of no use (15 minutes by default, 15 to 90 minutes): the
+ * It also locks itself after a stretch of no use (15 minutes by default, 15 to 90 minutes, or never): the
  * lock screen sends "still here" pings while you use it, and a session that goes quiet for longer
  * than the limit (plus a minute's grace) is refused by the server too.
  * Forgot it? Delete lock.json (with the app closed). This is a privacy lock, not encryption:
@@ -17,8 +17,8 @@ import { ValidationError } from './money.ts';
 
 interface LockFile { v: 1; salt: string; hash: string; length: number; updatedAt: string; idleMinutes?: number }
 
-/** Choices for locking after no use, in minutes: every 15 minutes up to 1 hour 30. */
-export const IDLE_CHOICES = [15, 30, 45, 60, 75, 90] as const;
+/** Choices for locking after no use, in minutes: every 15 minutes up to 1 hour 30, or 0 for never. */
+export const IDLE_CHOICES = [15, 30, 45, 60, 75, 90, 0] as const;
 export const DEFAULT_IDLE = 15;
 const GRACE_MS = 60_000;
 
@@ -48,7 +48,7 @@ export class Lock {
   /** How many digits the passcode has, so the lock screen can submit as soon as it's complete. */
   get length() { return this.read()?.length ?? null; }
 
-  /** Minutes without use before the app locks itself. */
+  /** Minutes without use before the app locks itself (0: never). */
   get idleMinutes(): number {
     const m = this.read()?.idleMinutes;
     return IDLE_CHOICES.includes(m as any) ? m! : DEFAULT_IDLE;
@@ -57,7 +57,7 @@ export class Lock {
   setIdleMinutes(minutes: unknown) {
     const f = this.read();
     if (!f) throw new ValidationError('Set a passcode first');
-    if (!IDLE_CHOICES.includes(minutes as any)) throw new ValidationError('Choose between 15 minutes and 1 hour 30, in 15-minute steps');
+    if (!IDLE_CHOICES.includes(minutes as any)) throw new ValidationError('Choose between 15 minutes and 1 hour 30 (in 15-minute steps), or never');
     this.write({ ...f, idleMinutes: minutes as number });
   }
 
@@ -66,7 +66,8 @@ export class Lock {
     if (!token) return false;
     const last = this.sessions.get(token);
     if (last === undefined) return false;
-    if (this.now() - last > this.idleMinutes * 60_000 + GRACE_MS) { this.sessions.delete(token); return false; }
+    const idle = this.idleMinutes;
+    if (idle > 0 && this.now() - last > idle * 60_000 + GRACE_MS) { this.sessions.delete(token); return false; }
     return true;
   }
 

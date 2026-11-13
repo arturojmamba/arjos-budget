@@ -95,7 +95,7 @@ test('locks itself after no use: 15 minutes by default, up to 1 hour 30, pushed 
   lock.touch(token);
   assert.equal(lock.isUnlocked(token), false, "a ping can't reopen an expired session");
 
-  for (const bad of [0, 10, 20, 95, 120, 'x']) assert.throws(() => lock.setIdleMinutes(bad), /15 minutes and 1 hour 30/);
+  for (const bad of [10, 20, 95, 120, -15, 'x']) assert.throws(() => lock.setIdleMinutes(bad), /15 minutes and 1 hour 30/);
   lock.setIdleMinutes(90);
   const t2 = lock.unlock('2468');
   now += 89 * 60_000;
@@ -104,5 +104,9 @@ test('locks itself after no use: 15 minutes by default, up to 1 hour 30, pushed 
   assert.equal(lock.isUnlocked(t2), false);
   lock.set('1357', '2468');
   assert.equal(lock.idleMinutes, 90, 'changing the passcode keeps the setting');
+  lock.setIdleMinutes(0); // never
+  const t3 = lock.unlock('1357');
+  now += 24 * 60 * 60_000;
+  assert.equal(lock.isUnlocked(t3), true, 'never: stays open until the app restarts or you lock it');
   fs.rmSync(dir, { recursive: true, force: true });
 });

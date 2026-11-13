@@ -5,9 +5,10 @@ import { Badge, Card, Field, Segmented, useApp, useConfirm, useData } from '../c
 import { navigate, setParams, useRoute } from '../router.ts';
 import { Icon } from '../components/Icon.tsx';
 import { T212Card } from '../components/T212.tsx';
+import { AboutCard } from '../components/Updates.tsx';
 import { money } from '../format.ts';
 
-type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'budgeting' | 'trading212' | 'data';
+type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'budgeting' | 'trading212' | 'data' | 'about';
 const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'profile', label: 'Profile', icon: 'heart', hint: 'Your name, picture and the app’s name' },
   { key: 'appearance', label: 'Appearance', icon: 'sparkles', hint: 'Theme, colour, text size and layout' },
@@ -16,6 +17,7 @@ const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'budgeting', label: 'Budgeting', icon: 'calendar', hint: 'How months and paydays line up' },
   { key: 'trading212', label: 'Trading 212', icon: 'trending-up', hint: 'Sync status and permissions' },
   { key: 'data', label: 'Data', icon: 'archive', hint: 'Health checks, backups and export' },
+  { key: 'about', label: 'About & updates', icon: 'info', hint: 'Version and updates' },
 ];
 
 export function Settings() {
@@ -49,12 +51,13 @@ export function Settings() {
         {tab === 'budgeting' && <BudgetingCard />}
         {tab === 'trading212' && <T212Card />}
         {tab === 'data' && <><HealthPanel /><DataCard /></>}
+        {tab === 'about' && <AboutCard />}
       </section>
     </div>
   );
 }
 
-const idleLabel = (m: number) => (m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `1 hour ${m - 60}`);
+const idleLabel = (m: number) => (m === 0 ? 'Never' : m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `1 hour ${m - 60}`);
 
 function PasscodeCard() {
   const { meta, refresh, toast } = useApp();
@@ -67,7 +70,7 @@ function PasscodeCard() {
   async function setIdle(minutes: number) {
     try {
       await api.put('/api/lock/idle', { minutes });
-      toast(`Locks after ${idleLabel(minutes)} without use`);
+      toast(minutes === 0 ? 'Only locks when the app starts or you lock it' : `Locks after ${idleLabel(minutes)} without use`);
       refresh();
       window.dispatchEvent(new Event('ledger-lock-config'));
     } catch (e: any) { toast(e.message, 'error'); }
@@ -93,7 +96,7 @@ function PasscodeCard() {
       {meta.lockEnabled && (
         <div className="idle-setting"><Field label="Lock after no use for" hint="Typing, clicking, scrolling or moving the mouse in the app counts as use.">
           <select value={meta.lockIdleMinutes ?? 15} onChange={(e) => setIdle(Number(e.target.value))} style={{ maxWidth: 220 }}>
-            {[15, 30, 45, 60, 75, 90].map((m) => <option key={m} value={m}>{idleLabel(m)}{m === 15 ? ' (default)' : ''}</option>)}
+            {[15, 30, 45, 60, 75, 90, 0].map((m) => <option key={m} value={m}>{idleLabel(m)}{m === 15 ? ' (default)' : ''}</option>)}
           </select>
         </Field></div>
       )}

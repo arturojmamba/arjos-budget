@@ -6,6 +6,7 @@
  *  - On first run you can start fresh or bring in an existing database (e.g. from `npm start`).
  *  - The Trading 212 key is encrypted with the system keychain (Electron safeStorage) and kept in a
  *    file in the app-data folder; it never goes into the database.
+ *  - Updates itself from the GitHub releases (electron/update.ts).
  *  - LEDGER_SMOKE=1 starts the server, checks the API answers, and quits (used by the build);
  *    LEDGER_SMOKE_FILE=path also writes the result there (a packaged Windows app has no console).
  *
@@ -16,10 +17,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { startServer, type Running } from '../server/start.ts';
+import { backup } from '../server/db.ts';
+import { Updater } from './update.ts';
 import type { DesktopHost } from '../server/app.ts';
 
 const PRODUCT = 'Ledger';
 const SMOKE = process.env.LEDGER_SMOKE === '1';
+/** CI: check for an update, install it without reopening, write the result, quit. */
+const UPDATE_TEST = process.env.LEDGER_UPDATE_TEST === '1';
+
+/** The GitHub repo releases come from, from package.json's "repository". */
+function releaseRepo(): string | null {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
+    const url = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url;
+    const m = /github\.com[/:]([^/]+\/[^/.]+)/.exec(url ?? '');
+    return m ? m[1] : null;
+  } catch { return null; }
+}
 app.setName(PRODUCT);
 
 const userData = app.getPath('userData');
@@ -163,6 +178,8 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     if (!(await firstRun())) { app.quit(); return; }
     loadKey();
+    const repo = releaseRepo();
+    const updater = repo ? new Updater(repo, () => { if (running) backup(running.db, backupDir); }, (m) => console.log(m)) : null;
     const host: DesktopHost = {
       version: app.getVersion(),
       platform: process.platform,
@@ -171,6 +188,17 @@ if (!app.requestSingleInstanceLock()) {
       clearT212Key: clearKey,
       openDataFolder: () => void shell.openPath(dataDir),
       relaunch: () => { quitting = true; app.relaunch(); app.exit(0); },
+      updates: updater ? {
+        info: () => updater.info(),
+        check: () => updater.check(),
+        setAuto: (on) => updater.setAuto(on),
+        openManual: () => updater.openManual(),
+        install: () => {
+          const r = updater.install();
+          if (r.ok) setTimeout(() => { quitting = true; app.quit(); }, 300);
+          return r;
+        },
+      } : undefined,
       touchId: process.platform === 'darwin' ? {
         available: () => { try { return systemPreferences.canPromptTouchID(); } catch { return false; } },
         prompt: async (reason: string) => {
@@ -188,6 +216,17 @@ if (!app.requestSingleInstanceLock()) {
     } catch (e: any) {
       dialog.showErrorBox(`${PRODUCT} couldn't start`, e?.message ?? String(e));
       app.exit(1);
+      return;
+    }
+
+    if (UPDATE_TEST && updater) {
+      const out = (line: string) => { console.log(line); if (process.env.LEDGER_SMOKE_FILE) fs.writeFileSync(process.env.LEDGER_SMOKE_FILE, line); };
+      const info = await updater.check();
+      if (info.state.status !== 'ready') { out(`UPDATE TEST FAILED ${JSON.stringify(info.state)}`); app.exit(1); return; }
+      const r = updater.install({ relaunch: false });
+      out(r.ok ? `UPDATE TEST OK ${app.getVersion()} -> ${info.state.available.version}` : `UPDATE TEST FAILED ${r.reason}`);
+      await running.close();
+      app.exit(r.ok ? 0 : 1);
       return;
     }
 
@@ -212,6 +251,7 @@ if (!app.requestSingleInstanceLock()) {
 
     buildMenu();
     createWindow(running.url);
+    updater?.schedule();
     app.on('activate', () => { if (win) win.show(); else if (running) createWindow(running.url); });
   });
 

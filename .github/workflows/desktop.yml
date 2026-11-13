@@ -1,13 +1,19 @@
 # Builds the desktop app for macOS and Windows, checks it starts, and publishes a release.
-#   Release: Actions → Desktop app → Run workflow, with a version such as v1.0.1 (or push a v* tag).
-#   Leave the version empty for a test build (downloadable from the run's page).
+#   Release: Actions → Desktop app → Run workflow, with the version from package.json (e.g. v1.2.1).
+#   Leave the version empty for a test build (downloadable from the run's page for a week).
+# After a release, "update-test" installs the previous version on a Mac and a Windows machine,
+# lets it update itself to the new one through the real updater, and checks the new one starts.
 name: Desktop app
 
 on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Publish as a release with this version (e.g. v1.0.1). Empty = test build only.'
+        description: 'Publish as a release with this version (e.g. v1.2.1). Must match package.json. Empty = test build only.'
+        required: false
+        default: ''
+      notes:
+        description: "Optional release notes, separated by ';'. Empty = the changes since the last release."
         required: false
         default: ''
   push:
@@ -15,6 +21,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  RELEASE: ${{ inputs.release || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
 
 jobs:
   build:
@@ -34,6 +43,15 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version matches package.json
+        if: env.RELEASE != ''
+        run: |
+          want="v$(node -p "require('./package.json').version")"
+          if [ "$RELEASE" != "$want" ]; then echo "::error::Release $RELEASE doesn't match package.json ($want). Bump the version first."; exit 1; fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -56,7 +74,7 @@ jobs:
 
       # Test builds: downloadable from the run's page for a week. Releases go on the Releases page instead.
       - uses: actions/upload-artifact@v4
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && inputs.release == '' }}
+        if: env.RELEASE == ''
         with:
           name: ledger-${{ runner.os }}
           path: |
@@ -65,18 +83,103 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Release notes
+        if: env.RELEASE != ''
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: |
+          if [ -n "$NOTES" ]; then
+            echo "$NOTES" | tr ';' '\n' | sed -e 's/^ *//' -e '/^$/d' -e 's/^/- /' > notes.md
+          else
+            prev="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$RELEASE" | head -1)"
+            git log --no-merges --pretty='- %s' ${prev:+$prev..}HEAD | grep -v '^- Desktop workflow' > notes.md || true
+          fi
+          printf '\n\nMac (Apple Silicon): Ledger-%s-mac-arm64.dmg · Mac (Intel): Ledger-%s-mac-x64.dmg · Windows: Ledger-Setup-%s.exe\nAlready have Ledger 1.2 or later? It updates itself: look for "Restart to update".\n' "${RELEASE#v}" "${RELEASE#v}" "${RELEASE#v}" >> notes.md
+          cat notes.md
+
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.release != ''
+        if: env.RELEASE != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release || github.ref_name }}
+          tag_name: ${{ env.RELEASE }}
           target_commitish: ${{ github.sha }}
-          name: Ledger ${{ inputs.release || github.ref_name }}
-          body: |
-            Desktop app for Mac and Windows. See "Desktop app" in the README for first-open steps.
-            - Mac (Apple Silicon): Ledger-…-mac-arm64.dmg
-            - Mac (Intel): Ledger-…-mac-x64.dmg
-            - Windows: Ledger-Setup-….exe
+          name: Ledger ${{ env.RELEASE }}
+          body_path: notes.md
           files: |
             release/*.dmg
             release/*.exe
+
+  update-test:
+    needs: build
+    if: inputs.release != '' || startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Find the previous release
+        id: prev
+        run: |
+          prev="$(gh release list -R "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName' | grep -vx "$RELEASE" | sort -V | tail -1)"
+          echo "previous: $prev"
+          # Versions before 1.2.0 have no updater.
+          if [ -z "$prev" ] || [ "$(printf '%s\nv1.2.0\n' "$prev" | sort -V | head -1)" != "v1.2.0" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+          echo "tag=$prev" >> "$GITHUB_OUTPUT"
+
+      - name: Install the previous version (Mac)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'macOS'
+        run: |
+          gh release download "${{ steps.prev.outputs.tag }}" -R "$GITHUB_REPOSITORY" -p '*-mac-arm64.dmg' -O old.dmg
+          hdiutil attach -nobrowse -mountpoint /tmp/old old.dmg
+          cp -R /tmp/old/Ledger.app /Applications/
+          hdiutil detach /tmp/old
+          defaults read /Applications/Ledger.app/Contents/Info CFBundleShortVersionString
+
+      - name: Let it update itself (Mac)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'macOS'
+        run: |
+          LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_UPDATE_TEST=1 LEDGER_SMOKE_FILE="$PWD/u.txt" /Applications/Ledger.app/Contents/MacOS/Ledger || true
+          cat u.txt; grep -q "UPDATE TEST OK" u.txt
+          want="${RELEASE#v}"
+          for i in $(seq 1 90); do
+            v="$(defaults read /Applications/Ledger.app/Contents/Info CFBundleShortVersionString 2>/dev/null || true)"
+            [ "$v" = "$want" ] && break; sleep 2
+          done
+          echo "installed: $v"; cat ~/Library/Application\ Support/Ledger/update.log || true
+          [ "$v" = "$want" ]
+          LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" /Applications/Ledger.app/Contents/MacOS/Ledger || true
+          cat s.txt; grep -q "SMOKE OK $want darwin" s.txt
+
+      - name: Install the previous version (Windows)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          gh release download "${{ steps.prev.outputs.tag }}" -R $env:GITHUB_REPOSITORY -p 'Ledger-Setup-*.exe' -O old.exe
+          Start-Process -FilePath .\old.exe -ArgumentList '/S' -Wait
+          Test-Path "$env:LOCALAPPDATA\Programs\Ledger\Ledger.exe"
+
+      - name: Let it update itself (Windows)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
+        run: |
+          exe="$LOCALAPPDATA/Programs/Ledger/Ledger.exe"
+          LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_UPDATE_TEST=1 LEDGER_SMOKE_FILE="$PWD/u.txt" "$exe" || true
+          cat u.txt; grep -q "UPDATE TEST OK" u.txt
+          want="${RELEASE#v}"
+          for i in $(seq 1 60); do
+            sleep 3
+            tasklist | grep -qi "Ledger-Setup" && continue
+            rm -f s.txt; LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" "$exe" || true
+            grep -q "SMOKE OK $want win32" s.txt 2>/dev/null && break
+          done
+          cat s.txt; grep -q "SMOKE OK $want win32" s.txt
+
+      - name: Nothing to test
+        if: steps.prev.outputs.skip == 'true'
+        run: echo "The previous release has no updater (before 1.2.0), so there's nothing to update from."
