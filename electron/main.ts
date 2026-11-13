@@ -142,8 +142,15 @@ function createWindow(url: string) {
 function buildMenu() {
   const mac = process.platform === 'darwin';
   const go = (route: string) => () => { if (!win) return; win.show(); void win.webContents.executeJavaScript(`location.hash = ${JSON.stringify('#' + route)}`); };
+  const checkUpdates = { label: 'Check for Updates…', click: go('/settings?tab=about') };
   const template: Electron.MenuItemConstructorOptions[] = [
-    ...(mac ? [{ role: 'appMenu' as const }] : []),
+    ...(mac ? [{ label: PRODUCT, submenu: [
+      { role: 'about' as const }, checkUpdates, { type: 'separator' as const },
+      { label: 'Settings…', accelerator: 'Cmd+,', click: go('/settings') }, { type: 'separator' as const },
+      { role: 'services' as const }, { type: 'separator' as const },
+      { role: 'hide' as const }, { role: 'hideOthers' as const }, { role: 'unhide' as const }, { type: 'separator' as const },
+      { role: 'quit' as const },
+    ] }] : []),
     { label: 'File', submenu: [
       { label: 'Import a statement…', accelerator: 'CmdOrCtrl+I', click: go('/import') },
       { label: 'Show data folder', click: () => void shell.openPath(dataDir) },
@@ -163,6 +170,7 @@ function buildMenu() {
       { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' },
     ] },
     { role: 'windowMenu' },
+    ...(mac ? [] : [{ label: 'Help', submenu: [checkUpdates] }]),
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

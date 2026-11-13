@@ -77,6 +77,14 @@ export function AboutCard() {
   const { info, setInfo, load } = useUpdates();
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(false);
+  const checked = React.useRef(false);
+  useEffect(() => {
+    if (checked.current || !info?.supported || !info.state) return;
+    checked.current = true;
+    if (info.state.status === 'idle' || info.state.status === 'none' || info.state.status === 'error') {
+      api.post<UpdateInfo>('/api/desktop/update/check', {}).then(setInfo).catch(() => {});
+    }
+  }, [info, setInfo]);
   useEffect(() => {
     if (info?.state?.status !== 'downloading' && info?.state?.status !== 'checking') return;
     const t = window.setTimeout(load, 1000);
