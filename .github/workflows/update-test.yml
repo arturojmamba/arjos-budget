@@ -81,7 +81,7 @@ jobs:
         if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
         run: |
           # Ledger.exe before the rename, Coil.exe after (the folder may be either name too).
-          find_exe() { ls "$LOCALAPPDATA"/Programs/*/Coil.exe "$LOCALAPPDATA"/Programs/*/Ledger.exe 2>/dev/null | head -1; }
+          find_exe() { ls "$LOCALAPPDATA"/Programs/*/Coil.exe "$LOCALAPPDATA"/Programs/*/Ledger.exe 2>/dev/null | head -1 || true; }
           exe="$(find_exe)"; echo "installed: $exe"
           env $TEST_ENV LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_SMOKE_FILE="$PWD/u.txt" timeout 300 "$exe" || true
           cat u.txt; grep -q "UPDATE TEST OK" u.txt
