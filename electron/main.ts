@@ -11,7 +11,7 @@
  *
  * Bundled to dist-electron/main.mjs by scripts/build-desktop.mjs.
  */
-import { app, BrowserWindow, Menu, dialog, safeStorage, shell, nativeTheme } from 'electron';
+import { app, BrowserWindow, Menu, dialog, safeStorage, shell, nativeTheme, systemPreferences } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -132,6 +132,7 @@ function buildMenu() {
     { label: 'File', submenu: [
       { label: 'Import a statement…', accelerator: 'CmdOrCtrl+I', click: go('/import') },
       { label: 'Show data folder', click: () => void shell.openPath(dataDir) },
+      { label: 'Lock', accelerator: 'CmdOrCtrl+L', click: () => { if (!win) return; win.show(); void win.webContents.executeJavaScript("window.dispatchEvent(new Event('ledger-lock-now'))"); } },
       { type: 'separator' },
       mac ? { role: 'close' } : { role: 'quit' },
     ] },
@@ -170,6 +171,12 @@ if (!app.requestSingleInstanceLock()) {
       clearT212Key: clearKey,
       openDataFolder: () => void shell.openPath(dataDir),
       relaunch: () => { quitting = true; app.relaunch(); app.exit(0); },
+      touchId: process.platform === 'darwin' ? {
+        available: () => { try { return systemPreferences.canPromptTouchID(); } catch { return false; } },
+        prompt: async (reason: string) => {
+          try { win?.show(); await systemPreferences.promptTouchID(reason); return true; } catch { return false; }
+        },
+      } : undefined,
     };
     try {
       running = await startServer({

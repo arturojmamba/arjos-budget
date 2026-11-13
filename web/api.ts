@@ -32,6 +32,7 @@ export interface Meta {
   frequencies: Frequency[]; trading212: { configured: boolean };
   currentMonth: string; today: string; settings: { rollforwardDays: number };
   appearance: Appearance; profile: Profile;
+  lockEnabled: boolean;
   /** Set when running as the desktop app. */
   desktop: { version: string; platform: string; dataDir: string } | null;
 }
@@ -55,6 +56,8 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  // The app was locked (another tab, or Lock now): show the lock screen.
+  if (res.status === 401 && data.locked) window.dispatchEvent(new Event('ledger-locked'));
   if (!res.ok) throw new ApiError(data.error ?? `Request failed (${res.status})`);
   return data as T;
 }

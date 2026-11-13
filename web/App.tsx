@@ -152,10 +152,13 @@ export function App() {
             ))}
           </nav>
           <button className="nav-help" onClick={() => setHelp(true)}><Icon name="info" size={16} /> Keyboard shortcuts <kbd>?</kbd></button>
-          <a className="profile-chip" href="#/settings" title="Profile and appearance">
-            <Avatar profile={meta.profile} size={30} />
-            <span className="grow">{meta.profile.name || 'Add your name'}<br /><span className="muted small">Profile and appearance</span></span>
-          </a>
+          <div className="profile-row">
+            <a className="profile-chip" href="#/settings" title="Profile and appearance">
+              <Avatar profile={meta.profile} size={30} />
+              <span className="grow">{meta.profile.name || 'Add your name'}<br /><span className="muted small">Profile and appearance</span></span>
+            </a>
+            {meta.lockEnabled && <button className="btn btn-icon lock-now" title="Lock" aria-label="Lock the app" onClick={() => window.dispatchEvent(new Event('ledger-lock-now'))}><Icon name="lock" size={16} /></button>}
+          </div>
         </aside>
 
         <main className="main">

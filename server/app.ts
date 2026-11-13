@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { DB } from './db.ts';
 import { getSetting, setSetting, backup } from './db.ts';
 import { ValidationError } from './money.ts';
+import { Lock, LOCK_COOKIE, readCookie, sessionCookie, clearCookie } from './lock.ts';
 import { createTransaction, updateTransaction, deleteTransaction, simpleToPostings, mergeIntoTransfer, ACCOUNT_TYPES } from './ledger.ts';
 import { listAccounts, listCategories, listTransactions, getTransaction, monthSummary, monthSpending, monthsWithData } from './queries.ts';
 import {
@@ -36,7 +37,7 @@ import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
 import { spendingExplorer, cutBack, habits, budgetRecord, cashFlow, compareDrivers, weekly } from './insights.ts';
 
-type Handler = (ctx: { db: DB; params: Record<string, string>; query: URLSearchParams; body: any }) => unknown;
+type Handler = (ctx: { db: DB; params: Record<string, string>; query: URLSearchParams; body: any; session?: string; setCookie: (c: string) => void }) => unknown;
 
 interface Route { method: string; pattern: RegExp; keys: string[]; handler: Handler }
 
@@ -67,13 +68,54 @@ export interface DesktopHost {
   clearT212Key(): void;
   openDataFolder(): void;
   relaunch(): void;
+  /** Touch ID on Macs that have it: unlock without typing the passcode. */
+  touchId?: { available(): boolean; prompt(reason: string): Promise<boolean> };
 }
 let desktop: DesktopHost | null = null;
+// ---------- Passcode lock ----------
+let lock: Lock | null = null;
+/** The only calls that answer while the app is locked. */
+const OPEN_WHILE_LOCKED = new Set(['GET /api/lock/status', 'POST /api/lock/unlock', 'POST /api/lock/touchid']);
+route('GET', '/api/lock/status', ({ db, session }) => {
+  const p = getProfile(db);
+  return {
+    enabled: !!lock?.enabled, locked: !!lock && !lock.isUnlocked(session), length: lock?.length ?? null, wait: lock?.waitSeconds() ?? 0,
+    name: p.name, avatar: p.avatar, appName: p.appName, accent: getAppearance(db).accent, theme: getAppearance(db).theme,
+    touchId: !!lock?.enabled && !!desktop?.touchId?.available(), desktop: !!desktop,
+  };
+});
+route('POST', '/api/lock/unlock', ({ body, setCookie }) => {
+  if (!lock?.enabled) return { ok: true };
+  setCookie(sessionCookie(lock.unlock(body?.passcode)));
+  return { ok: true };
+});
+route('POST', '/api/lock/touchid', async ({ db, setCookie }) => {
+  if (!lock?.enabled) return { ok: true };
+  if (!desktop?.touchId?.available()) throw new ValidationError('Touch ID is not available');
+  const name = getProfile(db).appName || 'Ledger';
+  if (!(await desktop.touchId.prompt(`unlock ${name}`))) throw new ValidationError('Touch ID was cancelled');
+  setCookie(sessionCookie(lock.startSession()));
+  return { ok: true };
+});
+route('POST', '/api/lock/lock', ({ session, setCookie }) => { lock?.end(session); setCookie(clearCookie()); return { ok: true }; });
+route('POST', '/api/lock/passcode', ({ body, setCookie }) => {
+  if (!lock) throw new ValidationError('The passcode lock is not available here');
+  setCookie(sessionCookie(lock.set(body?.passcode, body?.current)));
+  return { ok: true };
+});
+route('POST', '/api/lock/remove', ({ body, setCookie }) => {
+  if (!lock) return { ok: true };
+  lock.remove(body?.current);
+  setCookie(clearCookie());
+  return { ok: true };
+});
+
 const needDesktop = () => { if (!desktop) throw new ValidationError('Only available in the desktop app'); return desktop; };
 
 // ---------- Meta ----------
 route('GET', '/api/meta', ({ db }) => ({
   desktop: desktop ? { version: desktop.version, platform: desktop.platform, dataDir: desktop.dataDir } : null,
+  lockEnabled: !!lock?.enabled,
   accountTypes: ACCOUNT_TYPES,
   presets: PRESETS.map((p) => ({ id: p.id, label: p.label, note: p.note })),
   months: monthsWithData(db),
@@ -359,8 +401,11 @@ route('DELETE', '/api/skipped/:id', ({ db, params }) => { dismissSkipped(db, id(
 route('DELETE', '/api/imports/:id', ({ db, params }) => { undoImport(db, id(params)); return { ok: true }; });
 
 // ---------- Backup ----------
-export function createApp(db: DB, opts: { staticDir?: string; backupDir: string; dbFile?: string; desktop?: DesktopHost }) {
+export function createApp(db: DB, opts: { staticDir?: string; backupDir: string; dbFile?: string; desktop?: DesktopHost; lockFile?: string }) {
   desktop = opts.desktop ?? null;
+  // The passcode (if any) lives next to the database, not in it.
+  const lockFile = opts.lockFile ?? (opts.dbFile && opts.dbFile !== ':memory:' ? path.join(path.dirname(opts.dbFile), 'lock.json') : null);
+  lock = lockFile ? new Lock(lockFile) : null;
   route('POST', '/api/backup', () => ({ file: backup(db, opts.backupDir) }));
   // Clear everything synced from Trading 212 (after a backup) and download it again with the current key.
   route('POST', '/api/t212/reset', () => {
@@ -410,12 +455,16 @@ export function createApp(db: DB, opts: { staticDir?: string; backupDir: string;
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
       if (url.pathname.startsWith('/api/')) {
+        const session = readCookie(req.headers.cookie, LOCK_COOKIE);
+        if (lock && !OPEN_WHILE_LOCKED.has(`${req.method} ${url.pathname}`) && !lock.isUnlocked(session)) return send(res, 401, { error: 'Locked', locked: true });
         const r = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
         if (!r) return send(res, 404, { error: 'Not found' });
         const match = url.pathname.match(r.pattern)!;
         const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(match[i + 1])]));
         const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readJson(req);
-        const result: any = await r.handler({ db, params, query: url.searchParams, body });
+        const cookies: string[] = [];
+        const result: any = await r.handler({ db, params, query: url.searchParams, body, session, setCookie: (c) => cookies.push(c) });
+        if (cookies.length) res.setHeader('Set-Cookie', cookies);
         if (result && typeof result === 'object' && '__raw' in result) {
           res.writeHead(200, { 'Content-Type': result.type, 'Content-Disposition': `attachment; filename="${result.filename}"` });
           return res.end(result.__raw);

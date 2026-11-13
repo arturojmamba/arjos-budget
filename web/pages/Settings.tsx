@@ -7,11 +7,12 @@ import { Icon } from '../components/Icon.tsx';
 import { T212Card } from '../components/T212.tsx';
 import { money } from '../format.ts';
 
-type TabKey = 'profile' | 'appearance' | 'display' | 'budgeting' | 'trading212' | 'data';
+type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'budgeting' | 'trading212' | 'data';
 const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'profile', label: 'Profile', icon: 'heart', hint: 'Your name, picture and the app’s name' },
   { key: 'appearance', label: 'Appearance', icon: 'sparkles', hint: 'Theme, colour, text size and layout' },
   { key: 'display', label: 'Numbers & privacy', icon: 'eye', hint: 'Pence, start page and hiding amounts' },
+  { key: 'lock', label: 'Passcode', icon: 'lock', hint: 'Ask for a passcode when the app opens' },
   { key: 'budgeting', label: 'Budgeting', icon: 'calendar', hint: 'How months and paydays line up' },
   { key: 'trading212', label: 'Trading 212', icon: 'trending-up', hint: 'Sync status and permissions' },
   { key: 'data', label: 'Data', icon: 'archive', hint: 'Health checks, backups and export' },
@@ -44,11 +45,65 @@ export function Settings() {
         {tab === 'profile' && <ProfileCard />}
         {tab === 'appearance' && <AppearanceCard />}
         {tab === 'display' && <DisplayCard />}
+        {tab === 'lock' && <PasscodeCard />}
         {tab === 'budgeting' && <BudgetingCard />}
         {tab === 'trading212' && <T212Card />}
         {tab === 'data' && <><HealthPanel /><DataCard /></>}
       </section>
     </div>
+  );
+}
+
+function PasscodeCard() {
+  const { meta, refresh, toast } = useApp();
+  const [mode, setMode] = useState<'idle' | 'set' | 'change' | 'off'>('idle');
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const reset = () => { setMode('idle'); setCurrent(''); setNext(''); setAgain(''); };
+  const digits = (v: string) => v.replace(/\D/g, '').slice(0, 12);
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (mode !== 'off' && next !== again) { toast("The two passcodes don't match", 'error'); return; }
+    setBusy(true);
+    try {
+      if (mode === 'off') { await api.post('/api/lock/remove', { current }); toast('Passcode turned off'); }
+      else { await api.post('/api/lock/passcode', { passcode: next, current: mode === 'change' ? current : undefined }); toast(mode === 'set' ? 'Passcode on. The app will ask for it when it opens.' : 'Passcode changed'); }
+      reset(); refresh();
+    } catch (err: any) { toast(err.message, 'error'); } finally { setBusy(false); }
+  }
+  const input = (label: string, value: string, set: (v: string) => void, auto = false) => (
+    <Field label={label}><input type="password" inputMode="numeric" autoComplete="off" value={value} onChange={(e) => set(digits(e.target.value))} autoFocus={auto} /></Field>
+  );
+  return (
+    <Card title="Passcode lock" action={meta.lockEnabled ? <Badge tone="good"><Icon name="lock" size={12} /> On</Badge> : <Badge>Off</Badge>}>
+      <p className="muted">When it's on, the app opens on a lock screen with your picture and name, and nothing loads until the passcode is entered. It asks every time the app starts{meta.desktop?.platform === 'darwin' ? ', and Touch ID works too on Macs that have it' : ''}.</p>
+      {mode === 'idle' ? (
+        <div className="row gap wrap">
+          {meta.lockEnabled ? (
+            <>
+              <button className="btn btn-primary" onClick={() => window.dispatchEvent(new Event('ledger-lock-now'))}><Icon name="lock" size={16} /> Lock now</button>
+              <button className="btn" onClick={() => setMode('change')}>Change passcode</button>
+              <button className="btn btn-danger-outline" onClick={() => setMode('off')}>Turn off</button>
+            </>
+          ) : <button className="btn btn-primary" onClick={() => setMode('set')}><Icon name="lock" size={16} /> Set a passcode</button>}
+        </div>
+      ) : (
+        <form className="passcode-form" onSubmit={save}>
+          {mode !== 'set' && input('Current passcode', current, setCurrent, true)}
+          {mode !== 'off' && input(mode === 'change' ? 'New passcode (4 to 12 digits)' : 'Passcode (4 to 12 digits)', next, setNext, mode === 'set')}
+          {mode !== 'off' && input('Type it again', again, setAgain)}
+          <div className="row gap">
+            <button className={`btn ${mode === 'off' ? 'btn-danger' : 'btn-primary'}`} disabled={busy || (mode !== 'set' && current.length < 4) || (mode !== 'off' && next.length < 4)}>
+              {mode === 'off' ? 'Turn off passcode' : mode === 'change' ? 'Change passcode' : 'Turn on passcode'}
+            </button>
+            <button type="button" className="btn" onClick={reset}>Cancel</button>
+          </div>
+        </form>
+      )}
+      <p className="muted small" style={{ marginTop: 14 }}>The passcode is stored only as a scrambled hash in <code>lock.json</code>, next to your data file, and isn't included in backups. If you forget it, quit the app and delete that file. This keeps people out of the app; it doesn't encrypt the data file itself.</p>
+    </Card>
   );
 }
 
