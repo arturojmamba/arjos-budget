@@ -3,7 +3,7 @@ import { api } from '../api.ts';
 import { Icon } from './Icon.tsx';
 
 interface LockStatus {
-  enabled: boolean; locked: boolean; length: number | null; wait: number;
+  enabled: boolean; locked: boolean; length: number | null; wait: number; idleMinutes: number | null;
   name: string; avatar: string | null; appName: string; accent: string; theme: string; touchId: boolean; desktop: boolean;
 }
 
@@ -17,14 +17,49 @@ export function LockGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     check();
     const relock = () => check();
-    const lockNow = async () => { try { await api.post('/api/lock/lock', {}); } finally { check(); } };
+    const lockNow = async () => { try { await api.post('/api/lock/lock', {}); } catch { /* already locked */ } finally { check(); } };
     window.addEventListener('ledger-locked', relock);
     window.addEventListener('ledger-lock-now', lockNow);
-    return () => { window.removeEventListener('ledger-locked', relock); window.removeEventListener('ledger-lock-now', lockNow); };
+    window.addEventListener('ledger-lock-config', relock);
+    return () => {
+      window.removeEventListener('ledger-locked', relock); window.removeEventListener('ledger-lock-now', lockNow);
+      window.removeEventListener('ledger-lock-config', relock);
+    };
   }, [check]);
+  useIdleLock(!!status && status.enabled && !status.locked ? status.idleMinutes : null);
   if (!status) return <div className="lock-boot" />;
   if (status.locked) return <LockScreen status={status} onUnlocked={() => { setStatus({ ...status, locked: false }); setGeneration((g) => g + 1); }} />;
   return <React.Fragment key={generation}>{children}</React.Fragment>;
+}
+
+/**
+ * Locks the app after `minutes` without use. Typing, clicking, scrolling and moving the mouse count
+ * as use; background refreshes don't. While you're active the server is told once a minute, so it
+ * keeps your session open; if the window was asleep or hidden, the server has already locked it.
+ */
+function useIdleLock(minutes: number | null) {
+  useEffect(() => {
+    if (!minutes) return;
+    let last = Date.now();
+    let lastPing = Date.now();
+    const limit = minutes * 60_000;
+    const used = () => {
+      const now = Date.now();
+      last = now;
+      if (now - lastPing > 60_000) { lastPing = now; api.post('/api/lock/activity', {}).catch(() => {}); }
+    };
+    const check = () => { if (Date.now() - last >= limit) window.dispatchEvent(new Event('ledger-lock-now')); };
+    const events = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'scroll', 'touchstart'] as const;
+    for (const e of events) window.addEventListener(e, used, { passive: true, capture: true });
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = window.setInterval(check, 10_000);
+    return () => {
+      for (const e of events) window.removeEventListener(e, used, { capture: true } as EventListenerOptions);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(timer);
+    };
+  }, [minutes]);
 }
 
 function LockScreen({ status, onUnlocked }: { status: LockStatus; onUnlocked: () => void }) {

@@ -54,6 +54,8 @@ export function Settings() {
   );
 }
 
+const idleLabel = (m: number) => (m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `1 hour ${m - 60}`);
+
 function PasscodeCard() {
   const { meta, refresh, toast } = useApp();
   const [mode, setMode] = useState<'idle' | 'set' | 'change' | 'off'>('idle');
@@ -62,6 +64,14 @@ function PasscodeCard() {
   const [again, setAgain] = useState('');
   const [busy, setBusy] = useState(false);
   const reset = () => { setMode('idle'); setCurrent(''); setNext(''); setAgain(''); };
+  async function setIdle(minutes: number) {
+    try {
+      await api.put('/api/lock/idle', { minutes });
+      toast(`Locks after ${idleLabel(minutes)} without use`);
+      refresh();
+      window.dispatchEvent(new Event('ledger-lock-config'));
+    } catch (e: any) { toast(e.message, 'error'); }
+  }
   const digits = (v: string) => v.replace(/\D/g, '').slice(0, 12);
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +81,7 @@ function PasscodeCard() {
       if (mode === 'off') { await api.post('/api/lock/remove', { current }); toast('Passcode turned off'); }
       else { await api.post('/api/lock/passcode', { passcode: next, current: mode === 'change' ? current : undefined }); toast(mode === 'set' ? 'Passcode on. The app will ask for it when it opens.' : 'Passcode changed'); }
       reset(); refresh();
+      window.dispatchEvent(new Event('ledger-lock-config'));
     } catch (err: any) { toast(err.message, 'error'); } finally { setBusy(false); }
   }
   const input = (label: string, value: string, set: (v: string) => void, auto = false) => (
@@ -78,7 +89,14 @@ function PasscodeCard() {
   );
   return (
     <Card title="Passcode lock" action={meta.lockEnabled ? <Badge tone="good"><Icon name="lock" size={12} /> On</Badge> : <Badge>Off</Badge>}>
-      <p className="muted">When it's on, the app opens on a lock screen with your picture and name, and nothing loads until the passcode is entered. It asks every time the app starts{meta.desktop?.platform === 'darwin' ? ', and Touch ID works too on Macs that have it' : ''}.</p>
+      <p className="muted">When it's on, the app opens on a lock screen with your picture and name, and nothing loads until the passcode is entered. It asks every time the app starts, and locks itself when you haven't used it for a while{meta.desktop?.platform === 'darwin' ? '. Touch ID works too on Macs that have it' : ''}.</p>
+      {meta.lockEnabled && (
+        <div className="idle-setting"><Field label="Lock after no use for" hint="Typing, clicking, scrolling or moving the mouse in the app counts as use.">
+          <select value={meta.lockIdleMinutes ?? 15} onChange={(e) => setIdle(Number(e.target.value))} style={{ maxWidth: 220 }}>
+            {[15, 30, 45, 60, 75, 90].map((m) => <option key={m} value={m}>{idleLabel(m)}{m === 15 ? ' (default)' : ''}</option>)}
+          </select>
+        </Field></div>
+      )}
       {mode === 'idle' ? (
         <div className="row gap wrap">
           {meta.lockEnabled ? (

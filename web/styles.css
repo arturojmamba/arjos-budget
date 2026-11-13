@@ -1407,3 +1407,4 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .profile-row { display: flex; align-items: center; gap: 6px; }
 .profile-row .profile-chip { flex: 1; min-width: 0; }
 .lock-now { flex-shrink: 0; }
+.idle-setting { margin: 14px 0 16px; }

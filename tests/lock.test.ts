@@ -76,3 +76,33 @@ test('locked app: only the lock screen answers until unlocked; a restart locks a
   await app.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('locks itself after no use: 15 minutes by default, up to 1 hour 30, pushed back by activity', () => {
+  let now = 5_000_000;
+  const dir = tmp();
+  const lock = new Lock(path.join(dir, 'lock.json'), () => now);
+  assert.throws(() => lock.setIdleMinutes(30), /Set a passcode first/);
+  const token = lock.set('2468');
+  assert.equal(lock.idleMinutes, 15);
+
+  now += 14 * 60_000;
+  assert.equal(lock.isUnlocked(token), true);
+  lock.touch(token);                       // still using it
+  now += 15 * 60_000;
+  assert.equal(lock.isUnlocked(token), true, 'within 15 minutes (plus a minute grace) of the last use');
+  now += 2 * 60_000;
+  assert.equal(lock.isUnlocked(token), false, 'quiet for over 15 minutes: locked');
+  lock.touch(token);
+  assert.equal(lock.isUnlocked(token), false, "a ping can't reopen an expired session");
+
+  for (const bad of [0, 10, 20, 95, 120, 'x']) assert.throws(() => lock.setIdleMinutes(bad), /15 minutes and 1 hour 30/);
+  lock.setIdleMinutes(90);
+  const t2 = lock.unlock('2468');
+  now += 89 * 60_000;
+  assert.equal(lock.isUnlocked(t2), true);
+  now += 2 * 60_000 + 1;
+  assert.equal(lock.isUnlocked(t2), false);
+  lock.set('1357', '2468');
+  assert.equal(lock.idleMinutes, 90, 'changing the passcode keeps the setting');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

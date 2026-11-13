@@ -28,7 +28,7 @@ Built for UK banking: pay arrives on the last working day of the month and funds
 - **Data health:** stale imports, uncategorised transactions, likely duplicates and overdue bills.
 - **Backups:** daily backups, a backup before every upgrade, plus downloadable backups and restore.
 - **Settings:** personalisation, a hide-amounts switch, light and dark themes, and keyboard shortcuts.
-- **Passcode lock:** optional. The app opens on a lock screen with your picture and name and won't answer until the passcode is entered (Touch ID works too in the Mac app). Every launch starts locked; lock any time from the sidebar or with ⌘L in the desktop app. The passcode is kept only as a salted hash in `lock.json` next to the database (not in it, so backups never carry it); forgot it? Quit and delete that file. It's a privacy lock, not encryption of the data file.
+- **Passcode lock:** optional. The app opens on a lock screen with your picture and name and won't answer until the passcode is entered (Touch ID works too in the Mac app). Every launch starts locked, and it locks itself after a stretch without use (15 minutes by default; choose up to 1 hour 30 in Settings → Passcode). Lock any time from the sidebar or with ⌘L in the desktop app. The passcode is kept only as a salted hash in `lock.json` next to the database (not in it, so backups never carry it); forgot it? Quit and delete that file. It's a privacy lock, not encryption of the data file.
 
 ## Desktop app (Mac and Windows)
 

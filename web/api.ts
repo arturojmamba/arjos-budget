@@ -33,6 +33,7 @@ export interface Meta {
   currentMonth: string; today: string; settings: { rollforwardDays: number };
   appearance: Appearance; profile: Profile;
   lockEnabled: boolean;
+  lockIdleMinutes: number | null;
   /** Set when running as the desktop app. */
   desktop: { version: string; platform: string; dataDir: string } | null;
 }

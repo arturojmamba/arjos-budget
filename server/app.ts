@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { DB } from './db.ts';
 import { getSetting, setSetting, backup } from './db.ts';
 import { ValidationError } from './money.ts';
-import { Lock, LOCK_COOKIE, readCookie, sessionCookie, clearCookie } from './lock.ts';
+import { Lock, LOCK_COOKIE, IDLE_CHOICES, readCookie, sessionCookie, clearCookie } from './lock.ts';
 import { createTransaction, updateTransaction, deleteTransaction, simpleToPostings, mergeIntoTransfer, ACCOUNT_TYPES } from './ledger.ts';
 import { listAccounts, listCategories, listTransactions, getTransaction, monthSummary, monthSpending, monthsWithData } from './queries.ts';
 import {
@@ -80,6 +80,7 @@ route('GET', '/api/lock/status', ({ db, session }) => {
   const p = getProfile(db);
   return {
     enabled: !!lock?.enabled, locked: !!lock && !lock.isUnlocked(session), length: lock?.length ?? null, wait: lock?.waitSeconds() ?? 0,
+    idleMinutes: lock?.enabled ? lock.idleMinutes : null, idleChoices: IDLE_CHOICES,
     name: p.name, avatar: p.avatar, appName: p.appName, accent: getAppearance(db).accent, theme: getAppearance(db).theme,
     touchId: !!lock?.enabled && !!desktop?.touchId?.available(), desktop: !!desktop,
   };
@@ -96,6 +97,13 @@ route('POST', '/api/lock/touchid', async ({ db, setCookie }) => {
   if (!(await desktop.touchId.prompt(`unlock ${name}`))) throw new ValidationError('Touch ID was cancelled');
   setCookie(sessionCookie(lock.startSession()));
   return { ok: true };
+});
+// Pings from the app while you use it (typing, clicking, scrolling), pushing the automatic lock back.
+route('POST', '/api/lock/activity', ({ session }) => { lock?.touch(session); return { ok: true }; });
+route('PUT', '/api/lock/idle', ({ body }) => {
+  if (!lock) throw new ValidationError('The passcode lock is not available here');
+  lock.setIdleMinutes(Number(body?.minutes));
+  return { idleMinutes: lock.idleMinutes };
 });
 route('POST', '/api/lock/lock', ({ session, setCookie }) => { lock?.end(session); setCookie(clearCookie()); return { ok: true }; });
 route('POST', '/api/lock/passcode', ({ body, setCookie }) => {
@@ -116,6 +124,7 @@ const needDesktop = () => { if (!desktop) throw new ValidationError('Only availa
 route('GET', '/api/meta', ({ db }) => ({
   desktop: desktop ? { version: desktop.version, platform: desktop.platform, dataDir: desktop.dataDir } : null,
   lockEnabled: !!lock?.enabled,
+  lockIdleMinutes: lock?.enabled ? lock.idleMinutes : null,
   accountTypes: ACCOUNT_TYPES,
   presets: PRESETS.map((p) => ({ id: p.id, label: p.label, note: p.note })),
   months: monthsWithData(db),
