@@ -11,6 +11,8 @@ import { ValidationError } from './money.ts';
 import { addMonths, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
 import { listAccounts, SAVED_SQL } from './queries.ts';
 import { taxYear } from './investments.ts';
+import { merchantKey } from './merchant.ts';
+export { merchantKey };
 
 export interface Range { from: string; to: string }
 
@@ -105,13 +107,6 @@ export function trends(db: DB, months = 12, today = todayIso()) {
 
 function monthHasData(db: DB, m: string): boolean {
   return !!db.prepare('SELECT 1 FROM transactions WHERE period = ? LIMIT 1').get(m);
-}
-
-/** A display name that groups store numbers and references together: "TESCO STORES 3297" → "Tesco Stores". */
-export function merchantKey(raw: string): string {
-  const cleaned = raw.replace(/\b\S*\d\S*\b/g, ' ').replace(/[*#|]+/g, ' ').replace(/\s+/g, ' ').trim();
-  const base = cleaned || raw.trim();
-  return base.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
 }
 
 /** Where the money goes: spending grouped by merchant. */

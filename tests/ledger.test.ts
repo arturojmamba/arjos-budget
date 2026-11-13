@@ -197,3 +197,18 @@ test('money moved into savings and investments counts as saved; moves between th
   assert.equal(r.total, 3);
   assert.equal(r.byMonth[0].saved, 35000);
 });
+
+test('place filter matches every description that cleans up to the same place, as Reports groups them', () => {
+  const { db, acc, cat } = setup();
+  const card = acc('Crest Card 1');
+  const buy = (date: string, description: string) =>
+    createTransaction(db, simpleToPostings({ kind: 'expense', date, description, accountId: card, categoryId: cat('Groceries'), amount: 1500 }));
+  buy('2026-08-02', 'BASKETCO STORES 3297');
+  buy('2026-08-09', 'BASKETCO STORES 1180');
+  buy('2026-08-10', 'BASKETCO EXPRESS');
+  buy('2026-09-01', 'BASKETCO STORES 3297');
+  const aug = listTransactions(db, { month: '2026-08', merchant: 'Basketco Stores' });
+  assert.equal(aug.total, 2);
+  assert.equal(listTransactions(db, { merchant: 'Basketco Stores' }).total, 3);
+  assert.equal(listTransactions(db, { merchant: 'Nowhere' }).total, 0);
+});

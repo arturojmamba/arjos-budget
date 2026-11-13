@@ -100,10 +100,12 @@ function Explorer({ params, set }: { params: URLSearchParams; set: (x: Record<st
     if (d.merchant) set({ merchant: d.merchant });
     else if (d.categoryId) set({ cat: d.categoryId, merchant: null });
   };
-  const focusMonth = (i: number) => {
-    if (!data || data.months.length <= 1) return;
+  /** A month in the chart opens that month's transactions, keeping the category, place or search you're looking at. */
+  const openMonth = (i: number) => {
+    if (!data) return;
     const m = data.months[i];
-    set({ from: `${m}-01`, to: monthEnd(m) });
+    if (!m) return;
+    navigate(`/transactions${qs({ month: m, categoryId: cat ?? undefined, merchant: merchant ?? undefined, search: q || undefined })}`);
   };
   if (error && !data) return <Card><Empty icon="alert" title="Couldn't load this">{error}</Empty></Card>;
   const levelTitle = !data ? '' : data.level === 'category' ? 'By category' : data.level === 'subcategory' ? `${data.category?.name} by subcategory` : data.level === 'merchant' ? `${data.crumbs[data.crumbs.length - 1].label} by place` : `${data.crumbs[data.crumbs.length - 1].label}`;
@@ -138,13 +140,13 @@ function Explorer({ params, set }: { params: URLSearchParams; set: (x: Record<st
           </div>
           {data.count === 0 ? <Card><Empty icon="search" title="No spending here">Try a longer period or clear the search.</Empty></Card> : (
             <>
-              <Card title={levelTitle} action={<span className="muted small">{data.level === 'transactions' ? 'Month by month' : 'Click a colour to look inside · click a month to focus on it · click the key to hide'}</span>}>
+              <Card title={levelTitle} action={<span className="muted small">{data.level === 'transactions' ? 'Month by month' : 'Click a colour to look inside · click a month to see its transactions · click the key to hide'}</span>}>
                 <StackedBars labels={data.months.map(shortMonth)} titles={data.months.map((m) => monthLabel(m))}
                   series={data.level === 'transactions' ? [{ key: 'all', label: data.crumbs[data.crumbs.length - 1].label, colour: data.category?.colour ?? '#2a78d6', values: data.monthTotals }] : data.series}
                   hidden={hidden} onToggle={toggle} height={260}
                   reference={data.months.length > 1 ? { value: Math.round(visible.reduce((n, s) => n + s.total, 0) / data.months.length), label: `average ${money(Math.round(visibleTotal / data.months.length))}` } : undefined}
                   onSegmentClick={data.level === 'transactions' ? undefined : (key) => drill(data.series.find((s) => s.key === key)?.drill ?? null)}
-                  onBarClick={data.months.length > 1 ? focusMonth : undefined} />
+                  onBarClick={openMonth} barHint="Click to see these transactions" />
               </Card>
               <div className="grid-main">
                 {data.level !== 'transactions' ? (
@@ -222,7 +224,7 @@ function TransactionsCard({ data, range }: { data: ExplorerData; range: Range })
   const [n, setN] = useState(12);
   const last = data.crumbs[data.crumbs.length - 1];
   return (
-    <Card pad={false} title="Latest transactions" action={<button className="link-btn small" onClick={() => txLink(range, { categoryId: data.category?.id, search: last.merchant ?? undefined })}>Open in Transactions</button>}>
+    <Card pad={false} title="Latest transactions" action={<button className="link-btn small" onClick={() => txLink(range, { categoryId: data.category?.id, merchant: last.merchant ?? undefined })}>Open in Transactions</button>}>
       <TxList list={data.transactions.slice(0, n)} />
       {data.transactions.length > n && <div className="pager"><button className="link-btn" onClick={() => setN(n + 24)}>Show more</button></div>}
     </Card>

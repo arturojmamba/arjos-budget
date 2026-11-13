@@ -24,6 +24,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
     categoryId: params.get('categoryId') ? Number(params.get('categoryId')) : null,
     kind: params.get('kind') ?? '',
     search: params.get('search') ?? '',
+    merchant: params.get('merchant') ?? '',
     uncategorised: params.get('uncategorised') === '1',
     budgetId: params.get('budgetId') ? Number(params.get('budgetId')) : null,
     from: params.get('from') ?? '',
@@ -112,7 +113,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
     refresh();
   }
 
-  const filtered = !!(f.month !== meta.currentMonth || f.accountId || f.categoryId || f.kind || f.search || f.uncategorised || f.budgetId || f.from);
+  const filtered = !!(f.month !== meta.currentMonth || f.accountId || f.categoryId || f.kind || f.search || f.merchant || f.uncategorised || f.budgetId || f.from);
   const catName = categories.find((c) => c.id === f.categoryId)?.name;
   const budgetName = useBudgetName(f.budgetId);
 
@@ -151,10 +152,11 @@ export function Transactions({ params }: { params: URLSearchParams }) {
         <label className="check select-page" title="Select everything on this page">
           <input type="checkbox" checked={allOnPageSelected} onChange={() => setSelected(allOnPageSelected ? new Set() : new Set(items.map((t) => t.id)))} disabled={items.length === 0} />
         </label>
-        <span>{total.toLocaleString('en-GB')} transaction{total === 1 ? '' : 's'}{catName ? ` in ${catName}` : ''}{budgetName ? ` in your ${budgetName} budget` : ''}{f.from && f.to ? ` from ${shortDate(f.from)} to ${shortDate(f.to)}` : ''}</span>
+        <span>{total.toLocaleString('en-GB')} transaction{total === 1 ? '' : 's'}{f.merchant ? ` at ${f.merchant}` : ''}{catName ? ` in ${catName}` : ''}{budgetName ? ` in your ${budgetName} budget` : ''}{f.from && f.to ? ` from ${shortDate(f.from)} to ${shortDate(f.to)}` : ''}</span>
         <span className="muted">In <Money value={totals.in} className="amt-in" /></span>
         <span className="muted">Out <Money value={totals.out} /></span>
         {f.search && monthQ && <button className="link-btn" onClick={() => update({ month: 'all' })}>Search all months</button>}
+        {f.merchant && <button className="link-btn" onClick={() => update({ merchant: '' })}>All places</button>}
         {filtered && <button className="link-btn" onClick={() => setParams('/transactions', {})}>Clear filters</button>}
         <span className="spacer" />
         <label className="page-size">Show

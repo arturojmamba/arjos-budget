@@ -120,6 +120,7 @@ route('GET', '/api/transactions', ({ db, query }) =>
     categoryIds: query.get('budgetId') && !budgetAccount(db, Number(query.get('budgetId'))) ? budgetCategoryIds(db, Number(query.get('budgetId'))) : undefined,
     kind: query.get('kind') || undefined,
     search: query.get('search') || undefined,
+    merchant: query.get('merchant') || undefined,
     uncategorised: query.get('uncategorised') === '1',
     limit: query.get('limit') === 'all' ? 100000 : int(query.get('limit')),
     offset: int(query.get('offset')),

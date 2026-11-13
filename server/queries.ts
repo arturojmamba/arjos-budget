@@ -2,6 +2,7 @@ import type { DB } from './db.ts';
 import { isLiability } from './ledger.ts';
 import { addMonths, monthOf, todayIso, daysInMonth } from './dates.ts';
 import { parseMoney } from './money.ts';
+import { merchantKey } from './merchant.ts';
 
 export interface AccountView {
   id: number;
@@ -140,6 +141,8 @@ export interface TransactionFilters {
   categoryIds?: number[];
   kind?: string;
   search?: string;
+  /** A place, as Reports names it (see merchantKey): matches every description that cleans up to it. */
+  merchant?: string;
   uncategorised?: boolean;
   limit?: number;
   offset?: number;
@@ -216,6 +219,11 @@ export function listTransactions(db: DB, f: TransactionFilters): {
   if (f.categoryIds && f.categoryIds.length) {
     where.push(`EXISTS (SELECT 1 FROM postings p WHERE p.transaction_id = t.id AND p.category_id IN (${f.categoryIds.map(() => '?').join(',')}))`);
     params.push(...f.categoryIds);
+  }
+  if (f.merchant) {
+    const ids = (db.prepare("SELECT id, IFNULL(NULLIF(merchant, ''), description) AS m FROM transactions").all() as { id: number; m: string }[])
+      .filter((r) => merchantKey(r.m) === f.merchant).map((r) => r.id);
+    where.push(ids.length ? `t.id IN (${ids.join(',')})` : '0');
   }
   if (f.uncategorised) {
     where.push("t.kind != 'transfer' AND EXISTS (SELECT 1 FROM postings p WHERE p.transaction_id = t.id AND p.category_id IS NULL)");

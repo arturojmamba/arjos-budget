@@ -94,16 +94,18 @@ function barPath(x: number, y: number, w: number, h: number, r: number, up: bool
  * Stacked bars (one bar per x), positive values up and negative down from zero,
  * with an optional line on the same axis and a dashed reference value.
  */
-export function StackedBars({ labels, titles, series, line, reference, height = 240, hidden, onToggle, onBarClick, onSegmentClick, selected, legend = true, formatTotal, grouped }: {
+export function StackedBars({ labels, titles, series, line, reference, height = 240, hidden, onToggle, onBarClick, onSegmentClick, selected, legend = true, formatTotal, grouped, barHint = 'Click to focus on this' }: {
   labels: string[]; titles?: string[]; series: Series[]; line?: { label: string; colour: string; values: number[] };
   reference?: { value: number; label: string }; height?: number; hidden?: Set<string>; onToggle?: (key: string) => void;
   onBarClick?: (i: number) => void; onSegmentClick?: (key: string, i: number) => void; selected?: number | null; legend?: boolean;
-  formatTotal?: (n: number) => string; grouped?: boolean;
+  formatTotal?: (n: number) => string; grouped?: boolean; barHint?: string;
 }) {
   const [ref, W] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<{ i: number; key: string | null; y: number } | null>(null);
   const shown = series.filter((s) => !hidden?.has(s.key));
   const n = labels.length;
+  // The months can change under the pointer (e.g. after a click): forget a hover that no longer exists.
+  useEffect(() => { setHover(null); }, [n, labels.join('|')]); // eslint-disable-line
   const padL = 52, padR = 10, padT = 10, padB = 26;
   const plotW = Math.max(10, W - padL - padR), plotH = height - padT - padB;
   const stacks = labels.map((_, i) => {
@@ -123,7 +125,7 @@ export function StackedBars({ labels, titles, series, line, reference, height = 
   const x0 = (i: number) => padL + i * band + (band - barW) / 2;
   const every = Math.max(1, Math.ceil((n * 46) / Math.max(1, plotW)));
 
-  const tip = hover && (() => {
+  const tip = hover && hover.i < n && (() => {
     const i = hover.i;
     const rows: TipRow[] = shown.map((s) => ({ colour: s.colour, label: s.label, value: money(s.values[i] ?? 0), key: s.key, v: s.values[i] ?? 0 }))
       .filter((r) => r.v !== 0).sort((a, b) => Math.abs(b.v) - Math.abs(a.v))
@@ -133,7 +135,7 @@ export function StackedBars({ labels, titles, series, line, reference, height = 
     const extra: TipRow[] = line ? [{ colour: line.colour, label: line.label, value: money(line.values[i] ?? 0), line: true }] : [];
     const capped = rows.length > 9 ? [...rows.slice(0, 8), { colour: '', label: `${rows.length - 8} more`, value: '' }] : rows;
     return <Tooltip x={x0(i) + barW / 2} y={hover.y} width={W} title={titles?.[i] ?? labels[i]} rows={[...head, ...capped, ...extra]}
-      foot={onSegmentClick && hover.key ? 'Click to look inside' : onBarClick ? 'Click to focus on this' : undefined} />;
+      foot={onSegmentClick && hover.key ? 'Click to look inside' : onBarClick ? barHint : undefined} />;
   })();
 
   return (
@@ -177,10 +179,10 @@ export function StackedBars({ labels, titles, series, line, reference, height = 
                 const active = hover?.i === i && hover.key === s.key;
                 segs.push(
                   <path key={s.key} d={isEnd ? barPath(x, yy, w, hh, 4, positive) : `M${x},${yy}h${w}v${hh}h${-w}Z`} fill={s.colour}
-                    className={`viz-seg ${hover && hover.i === i && hover.key && !active ? 'dim' : ''} ${onSegmentClick ? 'clickable' : ''}`}
+                    className={`viz-seg ${hover && hover.i === i && hover.key && !active ? 'dim' : ''} ${onSegmentClick || onBarClick ? 'clickable' : ''}`}
                     onMouseEnter={() => setHover({ i, key: s.key, y: 4 })}
                     onMouseLeave={() => setHover((h) => (h ? { ...h, key: null } : h))}
-                    onClick={(e) => { if (onSegmentClick) { e.stopPropagation(); onSegmentClick(s.key, i); } }} />,
+                    onClick={(e) => { e.stopPropagation(); if (onSegmentClick) onSegmentClick(s.key, i); else onBarClick?.(i); }} />,
                 );
               });
               return (
