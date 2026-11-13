@@ -13,6 +13,10 @@ interface Row {
   status: 'new' | 'duplicate' | 'possible_duplicate' | 'transfer_match' | 'error'; error?: string;
   match?: { transactionId: number; postingId: number; date: string; description: string; accountName: string };
   action: Action; kind: Kind; categoryId: number | null; transferAccountId: number | null; suggestionSource: string; remember?: boolean;
+  /** Category copied from the row with this index (same place). Changing that row again updates this one too. */
+  filledFrom?: number | null;
+  /** Edited during this import: stays in "Needs attention" so a misclick can still be put right. */
+  touched?: boolean;
 }
 interface Preview {
   presetId: string | null; presetLabel: string; presetNote?: string; mapping: Mapping | null; headers: string[]; rows: Row[];
@@ -86,12 +90,19 @@ export function Import() {
     setRows((prev) => {
       const target = prev.find((r) => r.index === index)!;
       const key = merchantKey(target.description);
+      const setsCategory = 'categoryId' in patch;
       return prev.map((r) => {
-        if (r.index === index) return { ...r, ...patch };
-        // Categorising one Tesco row categorises the other uncategorised Tesco rows too.
-        if (applyToSimilar && r.status === 'new' && r.action === 'create' && r.suggestionSource === 'none' && !r.categoryId && merchantKey(r.description) === key && Math.sign(r.amount ?? 0) === Math.sign(target.amount ?? 0)) {
-          return { ...r, ...patch, remember: false };
-        }
+        // A row you change yourself is yours: it no longer follows the row it was copied from.
+        if (r.index === index) return { ...r, ...patch, touched: true, filledFrom: setsCategory ? null : r.filledFrom };
+        if (!applyToSimilar || target.filledFrom != null) return r;
+        // Categorising a row also fills in the other rows for the same place that have no category yet, and
+        // re-applies to the rows it filled in earlier, so a misclick can be corrected by picking again.
+        // Categories from your rules or history, and rows you changed yourself, are left alone.
+        const copiedFromHere = r.filledFrom === index;
+        const sameUncategorised = r.status === 'new' && r.action === 'create' && r.suggestionSource === 'none' && r.kind === target.kind && !r.categoryId
+          && merchantKey(r.description) === key && Math.sign(r.amount ?? 0) === Math.sign(target.amount ?? 0);
+        if (copiedFromHere && r.action === 'create' && r.kind === target.kind) return { ...r, ...patch, remember: false, touched: true };
+        if (sameUncategorised) return { ...r, ...patch, remember: false, touched: true, filledFrom: index };
         return r;
       });
     });
@@ -129,7 +140,7 @@ export function Import() {
   }
 
   const visible = useMemo(() => rows.filter((r) => {
-    if (filter === 'attention') return r.status === 'error' || (r.action === 'create' && ((r.kind === 'transfer' && !r.transferAccountId) || (r.kind !== 'transfer' && !r.categoryId))) || r.status === 'possible_duplicate' || r.status === 'transfer_match';
+    if (filter === 'attention') return r.touched || r.status === 'error' || (r.action === 'create' && ((r.kind === 'transfer' && !r.transferAccountId) || (r.kind !== 'transfer' && !r.categoryId))) || r.status === 'possible_duplicate' || r.status === 'transfer_match';
     if (filter === 'new') return r.status === 'new';
     if (filter === 'dupes') return r.status === 'duplicate' || r.status === 'possible_duplicate';
     return true;
@@ -241,7 +252,7 @@ export function Import() {
                   <tr><th>Date</th><th>Description</th><th className="num">Amount</th><th>How to record it</th><th>Remember</th></tr>
                 </thead>
                 <tbody>
-                  {visible.map((r) => <ImportRow key={r.index} r={r} accountId={accountId!} onChange={updateRow} />)}
+                  {visible.map((r) => <ImportRow key={r.index} r={r} accountId={accountId!} onChange={updateRow} source={r.filledFrom != null ? rows.find((x) => x.index === r.filledFrom) : undefined} />)}
                 </tbody>
               </table>
             )}
@@ -255,7 +266,7 @@ export function Import() {
   );
 }
 
-function ImportRow({ r, accountId, onChange }: { r: Row; accountId: number; onChange: (index: number, patch: Partial<Row>, similar?: boolean) => void }) {
+function ImportRow({ r, accountId, onChange, source }: { r: Row; accountId: number; onChange: (index: number, patch: Partial<Row>, similar?: boolean) => void; source?: Row }) {
   const skipped = r.action === 'skip';
   if (r.status === 'error') {
     return <tr className="row-error"><td colSpan={5}><Icon name="alert" size={14} /> Row {r.index + 1}: {r.error}</td></tr>;
@@ -309,6 +320,7 @@ function ImportRow({ r, accountId, onChange }: { r: Row; accountId: number; onCh
             ))}
             {r.suggestionSource === 'rule' && <Badge tone="info">Rule</Badge>}
             {r.suggestionSource === 'history' && <Badge>Like last time</Badge>}
+            {source && r.categoryId ? <span className="muted tiny" title="Copied from another row for the same place. Change that row to change them all, or this one to change only this row.">same as {source.date ? shortDate(source.date) : 'another row'}</span> : null}
           </div>
         )}
       </td>
