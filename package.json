@@ -1,0 +1,30 @@
+{
+  "name": "finance-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first personal finance and budgeting app",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node scripts/build.mjs --watch & node --disable-warning=ExperimentalWarning --import tsx --watch-path=server server/index.ts",
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && node --disable-warning=ExperimentalWarning --import tsx server/index.ts",
+    "test": "node --disable-warning=ExperimentalWarning --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "backup": "node --disable-warning=ExperimentalWarning --import tsx scripts/backup.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tsx": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}

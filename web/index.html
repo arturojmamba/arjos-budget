@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <title>Ledger · Personal finance</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23ff5b45'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='-apple-system,sans-serif' font-weight='700'>£</text></svg>" />
+    <link rel="stylesheet" href="/main.css" />
+    <script>
+      // Apply theme, accent and size before first paint (saved by the app on each load).
+      try {
+        var a = JSON.parse(localStorage.getItem('finance.appearance') || 'null');
+        if (a) {
+          var r = document.documentElement;
+          if (a.theme === 'light' || a.theme === 'dark') r.setAttribute('data-theme', a.theme);
+          if (a.accent) r.style.setProperty('--accent', a.accent);
+          if (a.density === 'compact') r.classList.add('density-compact');
+          if (a.textSize && a.textSize !== 'normal') r.classList.add('text-' + a.textSize);
+          if (a.reduceMotion) r.classList.add('reduce-motion');
+        }
+        var t = localStorage.getItem('finance.title'); if (t) document.title = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
