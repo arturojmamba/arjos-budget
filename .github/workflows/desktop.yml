@@ -54,14 +54,16 @@ jobs:
           LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/smoke2.txt" "${{ matrix.smoke }}" || true
           cat smoke2.txt && grep -q "SMOKE OK" smoke2.txt
 
+      # Test builds: downloadable from the run's page for a week. Releases go on the Releases page instead.
       - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') && inputs.release == '' }}
         with:
           name: ledger-${{ runner.os }}
           path: |
             release/*.dmg
-            release/*.zip
             release/*.exe
           if-no-files-found: error
+          retention-days: 7
 
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v') || inputs.release != ''
@@ -77,5 +79,4 @@ jobs:
             - Windows: Ledger-Setup-….exe
           files: |
             release/*.dmg
-            release/*.zip
             release/*.exe
