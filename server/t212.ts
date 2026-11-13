@@ -13,7 +13,7 @@
  * - Each endpoint has its own rate limit; calls are spaced out and a 429 waits
  *   for the reset time the server gives (or gives up for this run).
  */
-import { type DB, tx } from './db.ts';
+import { type DB, tx, getSetting, setSetting } from './db.ts';
 import { ValidationError, parseMoney } from './money.ts';
 import { addDays, todayIso } from './dates.ts';
 import { type T212Config, parseSummary, setValuation, syncedAccounts } from './investments.ts';
@@ -363,8 +363,18 @@ export async function syncTrading212Full(db: DB, accountId: number, config: T212
   };
 
   try {
+    // Which Trading 212 account this key belongs to. A key for a different account would mix someone
+    // else's history into yours (history is only ever added to), so stop before anything is written.
+    const summaryBody = await client.get('/equity/account/summary', 'summary');
+    const accountNumber = summaryBody && typeof (summaryBody as any).id === 'number' ? String((summaryBody as any).id) : null;
+    const known = getSetting(db, T212_ACCOUNT_KEY, '');
+    if (accountNumber && known && accountNumber !== known) {
+      throw new T212Error('auth', `This API key is for a different Trading 212 account (ending ${accountNumber.slice(-4)}) from the one this app syncs with (ending ${known.slice(-4)}). Nothing was synced. Use your own key, or "Reset Trading 212 data" to switch accounts.`);
+    }
+    if (accountNumber && !known) setSetting(db, T212_ACCOUNT_KEY, accountNumber);
+
     await step('summary', async () => {
-      const parsed = parseSummary(await client.get('/equity/account/summary', 'summary'));
+      const parsed = parseSummary(summaryBody);
       if ('error' in parsed) throw new ValidationError(parsed.error);
       tx(db, () => {
         setValuation(db, accountId, todayIso(), parsed.value, 'trading212', parsed.details);
@@ -466,6 +476,38 @@ function upsertPosition(db: DB, accountId: number, r: NonNullable<ReturnType<typ
   ).run(...(cols.map((c) => (row as any)[c]) as any[]));
 }
 
+const T212_ACCOUNT_KEY = 't212_account_number';
+
+/** The Trading 212 account number the app syncs with (null until the first sync). */
+export function t212AccountNumber(db: DB): string | null {
+  return getSetting(db, T212_ACCOUNT_KEY, '') || null;
+}
+
+/**
+ * Forget everything downloaded from Trading 212 for an account: orders, dividends, deposits and
+ * withdrawals, holdings, pies, open orders and the daily values recorded by the sync, plus which
+ * Trading 212 account it was. The next sync downloads your full history again.
+ * Values you typed in yourself, your bank transactions and your settings are kept.
+ */
+export function resetTrading212(db: DB, accountId: number) {
+  return tx(db, () => {
+    const count = (sql: string) => (db.prepare(sql).get(accountId) as { n: number }).n;
+    const removed = {
+      orders: count('SELECT COUNT(*) AS n FROM t212_orders WHERE account_id = ?'),
+      cash: count('SELECT COUNT(*) AS n FROM t212_cash WHERE account_id = ?'),
+      dividends: count('SELECT COUNT(*) AS n FROM t212_dividends WHERE account_id = ?'),
+      values: count("SELECT COUNT(*) AS n FROM valuations WHERE account_id = ? AND source = 'trading212'"),
+    };
+    db.prepare('DELETE FROM t212_pie_instruments WHERE pie_id IN (SELECT id FROM t212_pies WHERE account_id = ?)').run(accountId);
+    for (const t of ['t212_pies', 't212_positions', 't212_pending', 't212_orders', 't212_dividends', 't212_cash']) db.prepare(`DELETE FROM ${t} WHERE account_id = ?`).run(accountId);
+    db.prepare("DELETE FROM valuations WHERE account_id = ? AND source = 'trading212'").run(accountId);
+    db.prepare("UPDATE t212_sync SET status = 'never', message = NULL, last_ok_at = NULL, items = 0, backfilled = 0 WHERE endpoint != 'instruments'").run();
+    db.prepare('DELETE FROM settings WHERE key = ?').run(T212_ACCOUNT_KEY);
+    db.prepare('UPDATE accounts SET sync_error = NULL, last_synced_at = NULL WHERE id = ?').run(accountId);
+    return removed;
+  });
+}
+
 /** Start a full sync in the background (used by "Sync now"). Returns at once. */
 export function startSync(db: DB, config: T212Config | null, deps: SyncDeps = {}, opts: { force?: boolean } = {}) {
   const ids = syncedAccounts(db);
@@ -483,6 +525,7 @@ export function syncStatus(db: DB, config: T212Config | null) {
   const accountId = syncedAccounts(db)[0] ?? null;
   return {
     configured: config !== null,
+    accountNumber: t212AccountNumber(db),
     environment: config?.baseUrl.includes('demo') ? 'demo' : 'live',
     accountId,
     running: state.running,

@@ -114,6 +114,7 @@ export interface ValuationPoint { date: string; value: number; contributed: numb
 
 export interface T212Endpoint { key: string; label: string; permission: string; status: 'never' | 'ok' | 'denied' | 'error' | 'unavailable'; message: string | null; lastOkAt: string | null; lastTryAt: string | null; items: number }
 export interface T212Status {
+  accountNumber: string | null;
   configured: boolean; environment: 'live' | 'demo'; accountId: number | null; running: boolean; step: string | null; lastRunError: string | null;
   endpoints: T212Endpoint[];
   cash: { amount: number; asOf: string; since: string | null; days: number; nudge: boolean } | null;

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type T212Status } from '../api.ts';
 import { money, timeAgo } from '../format.ts';
-import { Badge, Card, useApp } from './ui.tsx';
+import { Badge, Card, useApp, useConfirm } from './ui.tsx';
 import { Icon } from './Icon.tsx';
 
 /** Trading 212 sync status, with "Sync now" that runs in the background and polls until done. */
@@ -43,7 +43,18 @@ export function useT212(onDone?: () => void) {
       timer.current = window.setTimeout(load, 800);
     } catch (e: any) { toast(e.message, 'error'); }
   };
-  return { status, sync, reload: load };
+  /** Clear everything synced from Trading 212 (the server backs up first) and sync again. */
+  const reset = async () => {
+    try {
+      const r = await api.post<{ backup: string; started: boolean }>('/api/t212/reset', {});
+      toast(r.started ? 'Cleared. Downloading your Trading 212 history again…' : 'Cleared. Sync to download your history again.');
+      was.current = r.started;
+      refresh();
+      if (timer.current) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(load, 800);
+    } catch (e: any) { toast(e.message, 'error'); }
+  };
+  return { status, sync, reset, reload: load };
 }
 
 const TONE = { ok: 'good', denied: 'warn', error: 'bad', unavailable: 'neutral', never: 'neutral' } as const;
@@ -51,7 +62,11 @@ const WORD = { ok: 'Working', denied: 'No permission', error: 'Problem', unavail
 
 export function T212Card() {
   const { meta } = useApp();
-  const { status, sync } = useT212();
+  const { status, sync, reset } = useT212();
+  const [confirm, confirmNode] = useConfirm();
+  const askReset = async () => {
+    if (await confirm('This clears everything downloaded from Trading 212: orders, dividends, deposits and withdrawals, holdings, pies and the daily values the sync recorded. Then it downloads your history again using the key in your .env file. A backup is saved first. Values you typed in yourself and your bank transactions are kept. Use this if the wrong API key was ever used.', { label: 'Reset and re-sync', danger: true })) reset();
+  };
 
   if (!meta.trading212.configured) {
     return (
@@ -100,6 +115,13 @@ export function T212Card() {
         </tbody>
       </table>
       <p className="muted small">The first sync reads your whole history, a page at a time within Trading 212's limits, so it can take a few minutes. After that only new items are fetched.</p>
+      <div className="row gap wrap t212-account">
+        <span className="muted small grow">
+          {status?.accountNumber ? <>Synced with Trading 212 account ending <strong>{status.accountNumber.slice(-4)}</strong>. A key for a different account is refused, so its data can't mix with yours.</> : 'The account number is recorded on the next sync.'}
+        </span>
+        <button className="btn btn-sm btn-danger-outline" onClick={askReset} disabled={!status || status.running || status.accountId === null}>Reset Trading 212 data</button>
+      </div>
+      {confirmNode}
     </Card>
   );
 }

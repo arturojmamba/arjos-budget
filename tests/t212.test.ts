@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testDb } from './fixtures.ts';
-import { syncTrading212Full, syncStatus, uninvestedCash, parseOrder, parsePosition, T212Client, type T212Fetch } from '../server/t212.ts';
+import { syncTrading212Full, syncStatus, uninvestedCash, parseOrder, parsePosition, T212Client, resetTrading212, t212AccountNumber, type T212Fetch } from '../server/t212.ts';
 import { setValuation } from '../server/investments.ts';
 import { healthChecks } from '../server/health.ts';
 import { addDays, todayIso } from '../server/dates.ts';
@@ -188,4 +188,42 @@ test('investing page: holdings, pies, allocation and activity from the synced co
   assert.equal(d.dividends[0].amount, 321);
   assert.equal(symbolOf('EXMPl_EQ'), 'EXMP');
   assert.equal(symbolOf('ABCD_US_EQ'), 'ABCD');
+});
+
+test('the Trading 212 account number is recorded, and a key for another account is refused before anything is written', async () => {
+  const { db, isa } = setup();
+  const mine = fakeApi({ '/equity/account/summary': () => ({ ok: true, status: 200, json: async () => ({ ...structuredClone(summary), id: 11112222 }) }) });
+  await syncTrading212Full(db, isa, config, { fetch: mine.f, sleep: noSleep });
+  assert.equal(t212AccountNumber(db), '11112222');
+  const before = (db.prepare('SELECT COUNT(*) AS n FROM t212_cash').get() as any).n;
+
+  const theirs = fakeApi({
+    '/equity/account/summary': () => ({ ok: true, status: 200, json: async () => ({ ...structuredClone(summary), id: 99998888 }) }),
+    '/equity/history/transactions?limit=50': () => ({ ok: true, status: 200, json: async () => ({ items: [{ type: 'DEPOSIT', amount: 5, currency: 'GBP', reference: 'OTHER-1', dateTime: '2026-11-01T08:00:00Z' }], nextPagePath: null }) }),
+  });
+  await assert.rejects(syncTrading212Full(db, isa, config, { fetch: theirs.f, sleep: noSleep }), /different Trading 212 account \(ending 8888\).*ending 2222/);
+  assert.equal(theirs.calls.length, 1, 'stopped after the account check');
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM t212_cash').get() as any).n, before);
+  assert.equal(t212AccountNumber(db), '11112222');
+});
+
+test('reset clears everything synced from Trading 212 and keeps your own entries', async () => {
+  const { db, isa } = setup();
+  const api = fakeApi({ '/equity/account/summary': () => ({ ok: true, status: 200, json: async () => ({ ...structuredClone(summary), id: 11112222 }) }) });
+  await syncTrading212Full(db, isa, config, { fetch: api.f, sleep: noSleep });
+  setValuation(db, isa, '2026-01-31', 400000); // typed in by hand
+  const removed = resetTrading212(db, isa);
+  assert.equal(removed.orders, 2);
+  for (const t of ['t212_orders', 't212_cash', 't212_dividends', 't212_positions', 't212_pending', 't212_pies', 't212_pie_instruments']) {
+    assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as any).n, 0, t);
+  }
+  assert.deepEqual((db.prepare('SELECT source FROM valuations WHERE account_id = ?').all(isa) as any[]).map((v) => v.source), ['manual']);
+  assert.equal(t212AccountNumber(db), null);
+  assert.ok((db.prepare("SELECT backfilled FROM t212_sync WHERE endpoint = 'orders'").get() as any).backfilled === 0, 'history is read in full again');
+
+  // A different account can now be synced.
+  const other = fakeApi({ '/equity/account/summary': () => ({ ok: true, status: 200, json: async () => ({ ...structuredClone(summary), id: 33334444 }) }) });
+  await syncTrading212Full(db, isa, config, { fetch: other.f, sleep: noSleep });
+  assert.equal(t212AccountNumber(db), '33334444');
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM t212_orders').get() as any).n, 2);
 });

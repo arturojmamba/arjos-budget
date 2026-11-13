@@ -1348,3 +1348,6 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
   .isa-match .ellipsis { display: inline-block; max-width: 120px; vertical-align: bottom; }
   .isa-match td, .isa-match th { padding-left: 10px; padding-right: 10px; }
 }
+.btn-danger-outline { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+.btn-danger-outline:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.t212-account { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); align-items: center; }

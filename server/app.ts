@@ -27,8 +27,8 @@ import {
 } from './recurring.ts';
 import { listBudgets, createBudget, updateBudget, deleteBudget, reorderBudgets, suggestBudgets, budgetCategoryIds, budgetAccount, budgetGuide, updateGuide } from './budgets.ts';
 import { listDebts, debtPlan, saveDebtPlan, saveDebt, createDebt, deleteDebtDetails, linkCandidates, linkToDebt, reviewRepayments, debtTimeline, archiveDebt, addRepaymentToBills, DEBT_TYPES } from './debts.ts';
-import { setValuation, deleteValuation, investmentHistory, trading212Config } from './investments.ts';
-import { startSync, syncStatus, syncTrading212Full } from './t212.ts';
+import { setValuation, deleteValuation, investmentHistory, trading212Config, syncedAccounts } from './investments.ts';
+import { resetTrading212, startSync, syncStatus, syncTrading212Full } from './t212.ts';
 import { saveShares } from './shares.ts';
 import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
@@ -329,6 +329,17 @@ route('DELETE', '/api/imports/:id', ({ db, params }) => { undoImport(db, id(para
 // ---------- Backup ----------
 export function createApp(db: DB, opts: { staticDir?: string; backupDir: string; dbFile?: string }) {
   route('POST', '/api/backup', () => ({ file: backup(db, opts.backupDir) }));
+  // Clear everything synced from Trading 212 (after a backup) and download it again with the current key.
+  route('POST', '/api/t212/reset', () => {
+    const accountId = syncedAccounts(db)[0];
+    if (!accountId) throw new ValidationError('No account is set to sync with Trading 212.');
+    const file = backup(db, opts.backupDir);
+    const removed = resetTrading212(db, accountId);
+    let started = false;
+    const config = trading212Config();
+    if (config) { try { startSync(db, config); started = true; } catch { /* already running: the next sync picks it up */ } }
+    return { backup: path.basename(file), removed, started };
+  });
   route('GET', '/api/health', ({ db }) => healthChecks(db));
   // Download a copy of everything (a consistent snapshot, safe while the app is running).
   route('GET', '/api/backup/download', () => {
