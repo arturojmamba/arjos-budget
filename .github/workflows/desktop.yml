@@ -1,9 +1,15 @@
-# Builds the desktop app for macOS and Windows, checks it starts, and (for a v* tag) attaches it to a release.
-#   Run by hand: Actions → Desktop app → Run workflow.   Release: git tag v1.0.0 && git push --tags
+# Builds the desktop app for macOS and Windows, checks it starts, and publishes a release.
+#   Release: Actions → Desktop app → Run workflow, with a version such as v1.0.1 (or push a v* tag).
+#   Leave the version empty for a test build (downloadable from the run's page).
 name: Desktop app
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish as a release with this version (e.g. v1.0.1). Empty = test build only.'
+        required: false
+        default: ''
   push:
     tags: ['v*']
 
@@ -58,9 +64,17 @@ jobs:
           if-no-files-found: error
 
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Ledger ${{ inputs.release || github.ref_name }}
+          body: |
+            Desktop app for Mac and Windows. See "Desktop app" in the README for first-open steps.
+            - Mac (Apple Silicon): Ledger-…-mac-arm64.dmg
+            - Mac (Intel): Ledger-…-mac-x64.dmg
+            - Windows: Ledger-Setup-….exe
           files: |
             release/*.dmg
             release/*.zip
