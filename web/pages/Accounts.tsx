@@ -209,7 +209,7 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
         {isInvestment && (
           <>
             <label className="check"><input type="checkbox" checked={isa} onChange={(e) => setIsa(e.target.checked)} /><span>This is an ISA (counts towards your £20,000 allowance)</span></label>
-            <label className="check"><input type="checkbox" checked={sync} onChange={(e) => setSync(e.target.checked)} /><span>Get the value from Trading 212 automatically (needs the API key in <code>.env</code>)</span></label>
+            <label className="check"><input type="checkbox" checked={sync} onChange={(e) => setSync(e.target.checked)} /><span>Get the value from Trading 212 automatically (needs your API key: {meta.desktop ? 'add it in Settings → Trading 212' : <>in <code>.env</code></>})</span></label>
           </>
         )}
         {!isLiab && !isInvestment && (
@@ -307,7 +307,7 @@ function InvestmentModal({ account, onClose }: { account: Account; onClose: () =
           <div className="row gap">
             <button className="btn" onClick={() => t212.sync()} disabled={syncing || !meta.trading212.configured}><Icon name="refresh" size={16} /> {syncing ? 'Syncing…' : 'Sync now'}</button>
             <span className="muted small">{syncing ? `Reading ${t212.status?.step?.toLowerCase() ?? 'your account'}…` : <>{account.lastSyncedAt ? `Last synced ${timeAgo(account.lastSyncedAt)}. ` : ''}Syncs automatically every 6 hours while the app is running. Details in Settings.</>}</span>
-            {!meta.trading212.configured && <span className="tone-bad small">No API key found in .env</span>}
+            {!meta.trading212.configured && <span className="tone-bad small">{meta.desktop ? 'Add your API key in Settings → Trading 212' : 'No API key found in .env'}</span>}
           </div>
         )}
         <form className="row gap end" onSubmit={addValuation}>

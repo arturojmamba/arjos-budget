@@ -29,7 +29,32 @@ Built for UK banking: pay arrives on the last working day of the month and funds
 - **Backups:** daily backups, a backup before every upgrade, plus downloadable backups and restore.
 - **Settings:** personalisation, a hide-amounts switch, light and dark themes, and keyboard shortcuts.
 
-## Run it
+## Desktop app (Mac and Windows)
+
+The same app as a normal desktop app: no Node, npm or Terminal needed.
+
+**Download:** Mac (`Ledger-…-mac-arm64.dmg` for Apple Silicon, `…-x64.dmg` for Intel) or Windows (`Ledger-Setup-….exe`), from the repository's Releases page or as a file shared with you.
+
+**First open.** The app isn't signed with a paid Apple or Microsoft certificate, so the system warns you once:
+- **Mac:** open the .dmg and drag Ledger to Applications. Open it once; when macOS says it can't check it, go to System Settings → Privacy & Security, scroll down, and click **Open Anyway**. If it says the app is "damaged", run `xattr -dr com.apple.quarantine /Applications/Ledger.app` in Terminal once.
+- **Windows:** if SmartScreen says "Windows protected your PC", click **More info → Run anyway**.
+
+**Your data** lives in the system's app-data folder (Mac: `~/Library/Application Support/Ledger/data`, Windows: `%APPDATA%\Ledger\data`), with daily backups in its `backups` folder. On first launch you can start fresh or bring in an existing database (for example `data/finance.db` from running it with `npm start`). Settings → Data → *Show in Finder/Explorer* opens the folder.
+
+**Trading 212:** add the API key in Settings → Trading 212. It's encrypted with the system keychain and kept in the app-data folder, never in the database or backups.
+
+On a Mac, closing the window keeps the app running (so syncing carries on); quit with ⌘Q.
+
+**Building it yourself:**
+```bash
+npm install
+npm run desktop        # run it from source in a window
+npm run desktop:mac    # → release/Ledger-<version>-mac-<arch>.dmg (needs a Mac)
+npm run desktop:win    # → release/Ledger-Setup-<version>.exe (needs Windows)
+```
+GitHub builds both automatically: run **Actions → Desktop app → Run workflow**, or push a version tag (`git tag v1.0.1 && git push --tags`) to attach the installers to a release. Each build checks the packaged app starts before it's published.
+
+## Run it from source
 
 Requires Node 22.13 or newer (Node 24 recommended).
 
@@ -94,7 +119,8 @@ Give the key **read-only permissions** (account data, portfolio, history). The a
 
 ```
 server/
-  index.ts         startup, .env loading, scheduled sync and backups
+  index.ts         `npm start`: .env loading, then start.ts
+  start.ts         startup shared with the desktop app: restore, backups, scheduled sync, server
   db.ts            schema + migrations (node:sqlite, no native dependencies)
   ledger.ts        transaction rules and validation
   queries.ts       balances, lists, monthly summary
@@ -115,6 +141,7 @@ server/
   health.ts        data health checks
   app.ts           JSON API
 web/               React UI, bundled with esbuild
+electron/          desktop app (window, menus, data folder, keychain), bundled to dist-electron/
 tests/             node:test suites
 scripts/           build and backup
 ```

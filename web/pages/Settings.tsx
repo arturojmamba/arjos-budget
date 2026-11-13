@@ -85,9 +85,15 @@ function DataCard() {
       toast('Backup created');
     } catch (e: any) { toast(e.message, 'error'); }
   }
+  const { meta } = useApp();
+  const folderWord = meta.desktop?.platform === 'darwin' ? 'Finder' : meta.desktop?.platform === 'win32' ? 'Explorer' : 'your file manager';
   return (
     <Card title="Your data">
-      <p className="muted">Everything is stored in one SQLite file on this computer (<code>data/finance.db</code>). A backup is taken automatically each day, and the last 30 are kept in <code>data/backups</code>.</p>
+      {meta.desktop ? (
+        <p className="muted">Everything is stored in one file on this computer, in <code>{meta.desktop.dataDir}</code>. A backup is taken automatically each day, and the last 30 are kept in its <code>backups</code> folder. <button className="link-btn" onClick={() => api.post('/api/desktop/open-data', {})}>Show in {folderWord}</button></p>
+      ) : (
+        <p className="muted">Everything is stored in one SQLite file on this computer (<code>data/finance.db</code>). A backup is taken automatically each day, and the last 30 are kept in <code>data/backups</code>.</p>
+      )}
       <div className="row gap wrap">
         <button className="btn" onClick={backup}><Icon name="archive" size={16} /> Back up now</button>
         <a className="btn" href="/api/backup/download"><Icon name="download" size={16} /> Download a backup</a>
@@ -120,7 +126,7 @@ function HealthPanel() {
 }
 
 function Restore() {
-  const { toast } = useApp();
+  const { toast, meta } = useApp();
   const [confirm, confirmNode] = useConfirm();
   const input = useRef<HTMLInputElement>(null);
   const { data: status, reload } = useData<{ pending: boolean }>(() => api.get('/api/backup/restore'), []);
@@ -143,9 +149,13 @@ function Restore() {
   return (
     <div className="restore">
       {status?.pending ? (
-        <p className="hint-box"><Icon name="info" size={16} /><span>A backup is ready to restore. <strong>Stop the app and run <code>npm start</code> again</strong> to finish. Your current data is saved to <code>data/backups</code> first. <button className="link-btn" onClick={cancel}>Cancel</button></span></p>
+        meta.desktop ? (
+          <p className="hint-box"><Icon name="info" size={16} /><span>A backup is ready to restore. Your current data is saved to the <code>backups</code> folder first. <button className="btn btn-sm btn-primary" onClick={() => api.post('/api/desktop/relaunch', {})}>Restart now</button> <button className="link-btn" onClick={cancel}>Cancel</button></span></p>
+        ) : (
+          <p className="hint-box"><Icon name="info" size={16} /><span>A backup is ready to restore. <strong>Stop the app and run <code>npm start</code> again</strong> to finish. Your current data is saved to <code>data/backups</code> first. <button className="link-btn" onClick={cancel}>Cancel</button></span></p>
+        )
       ) : (
-        <p className="muted small">To restore, choose a backup file (from <code>data/backups</code> or one you downloaded). <button className="link-btn" onClick={() => input.current?.click()}>Restore from a backup…</button></p>
+        <p className="muted small">To restore, choose a backup file (from {meta.desktop ? 'the backups folder' : <code>data/backups</code>} or one you downloaded). <button className="link-btn" onClick={() => input.current?.click()}>Restore from a backup…</button></p>
       )}
       <input ref={input} type="file" accept=".db,.sqlite,application/vnd.sqlite3" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }} />
       {confirmNode}

@@ -1374,3 +1374,6 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .week-date { width: 34px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; font-size: 10.5px; text-transform: uppercase; color: var(--text-3); line-height: 1.1; }
 .week-date b { font-size: 15px; color: var(--text); }
 .week-sep { padding-top: 6px; border-top: 1px solid var(--border); }
+.t212-key-form { display: grid; gap: 10px; max-width: 520px; margin: 10px 0; }
+.t212-change { margin-top: 12px; }
+.t212-change .card { box-shadow: none; border: 1px solid var(--border); }

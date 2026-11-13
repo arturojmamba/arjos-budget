@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type T212Status } from '../api.ts';
 import { money, timeAgo } from '../format.ts';
-import { Badge, Card, useApp, useConfirm } from './ui.tsx';
+import { Badge, Card, Field, useApp, useConfirm } from './ui.tsx';
 import { Icon } from './Icon.tsx';
 
 /** Trading 212 sync status, with "Sync now" that runs in the background and polls until done. */
@@ -65,9 +65,10 @@ export function T212Card() {
   const { status, sync, reset } = useT212();
   const [confirm, confirmNode] = useConfirm();
   const askReset = async () => {
-    if (await confirm('This clears everything downloaded from Trading 212: orders, dividends, deposits and withdrawals, holdings, pies and the daily values the sync recorded. Then it downloads your history again using the key in your .env file. A backup is saved first. Values you typed in yourself and your bank transactions are kept. Use this if the wrong API key was ever used.', { label: 'Reset and re-sync', danger: true })) reset();
+    if (await confirm('This clears everything downloaded from Trading 212: orders, dividends, deposits and withdrawals, holdings, pies and the daily values the sync recorded. Then it downloads your history again using your saved API key. A backup is saved first. Values you typed in yourself and your bank transactions are kept. Use this if the wrong API key was ever used.', { label: 'Reset and re-sync', danger: true })) reset();
   };
 
+  if (!meta.trading212.configured && meta.desktop) return <T212KeyForm />;
   if (!meta.trading212.configured) {
     return (
       <Card title="Trading 212">
@@ -121,7 +122,60 @@ export function T212Card() {
         </span>
         <button className="btn btn-sm btn-danger-outline" onClick={askReset} disabled={!status || status.running || status.accountId === null}>Reset Trading 212 data</button>
       </div>
+      {meta.desktop && <KeyActions />}
       {confirmNode}
     </Card>
+  );
+}
+
+/** Desktop app: enter the Trading 212 key here. It's encrypted with the system keychain, never put in the database. */
+function T212KeyForm({ onDone }: { onDone?: () => void }) {
+  const { refresh, toast } = useApp();
+  const [key, setKey] = useState('');
+  const [secret, setSecret] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await api.post<{ started: boolean }>('/api/t212/key', { key, secret });
+      toast(r.started ? 'Key saved. Syncing now…' : 'Key saved');
+      setKey(''); setSecret('');
+      refresh();
+      onDone?.();
+    } catch (err: any) { toast(err.message, 'error'); } finally { setBusy(false); }
+  }
+  return (
+    <Card title="Trading 212">
+      <p className="muted">To sync your ISA automatically, create an API key in the Trading 212 app (Settings → API) and paste it here. Give it read-only permissions: account data, portfolio, orders, history and pies. This app only ever reads from Trading 212. It never places, changes or cancels orders.</p>
+      <form className="t212-key-form" onSubmit={save}>
+        <Field label="API key"><input value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} /></Field>
+        <Field label="Secret"><input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off" /></Field>
+        <div className="row gap">
+          <button className="btn btn-primary" disabled={busy || !key.trim() || !secret.trim()}>{busy ? 'Saving…' : 'Save key'}</button>
+          {onDone && <button type="button" className="btn" onClick={onDone}>Cancel</button>}
+        </div>
+      </form>
+      <p className="muted small">The key is encrypted with your computer's keychain and stored in the app's own folder. It's never put in the database, in backups, or shown again here.</p>
+    </Card>
+  );
+}
+
+function KeyActions() {
+  const { refresh, toast } = useApp();
+  const [changing, setChanging] = useState(false);
+  const [confirm, confirmNode] = useConfirm();
+  if (changing) return <div className="t212-change"><T212KeyForm onDone={() => setChanging(false)} /></div>;
+  const remove = async () => {
+    if (!(await confirm('Remove the saved Trading 212 key? Syncing stops; everything already synced stays.', { label: 'Remove key', danger: true }))) return;
+    try { await api.del('/api/t212/key'); toast('Key removed'); refresh(); } catch (e: any) { toast(e.message, 'error'); }
+  };
+  return (
+    <p className="row gap small muted" style={{ marginTop: 10 }}>
+      <span className="grow">API key saved in your keychain.</span>
+      <button className="link-btn" onClick={() => setChanging(true)}>Change key</button>
+      <button className="link-btn tone-bad" onClick={remove}>Remove key</button>
+      {confirmNode}
+    </p>
   );
 }

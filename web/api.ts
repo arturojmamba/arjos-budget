@@ -32,6 +32,8 @@ export interface Meta {
   frequencies: Frequency[]; trading212: { configured: boolean };
   currentMonth: string; today: string; settings: { rollforwardDays: number };
   appearance: Appearance; profile: Profile;
+  /** Set when running as the desktop app. */
+  desktop: { version: string; platform: string; dataDir: string } | null;
 }
 export interface Appearance {
   theme: 'system' | 'light' | 'dark'; accent: string; density: 'comfortable' | 'compact'; textSize: 'small' | 'normal' | 'large';

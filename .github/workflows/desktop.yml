@@ -1,0 +1,67 @@
+# Builds the desktop app for macOS and Windows, checks it starts, and (for a v* tag) attaches it to a release.
+#   Run by hand: Actions → Desktop app → Run workflow.   Release: git tag v1.0.0 && git push --tags
+name: Desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: --mac
+            smoke: release/mac-arm64/Ledger.app/Contents/MacOS/Ledger
+          - os: windows-latest
+            target: --win
+            smoke: release/win-unpacked/Ledger.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
+      - run: npm run build && npm run desktop:bundle
+
+      - name: Check it starts inside Electron (before packaging)
+        run: |
+          LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/smoke.txt" npx electron . || true
+          cat smoke.txt && grep -q "SMOKE OK" smoke.txt
+
+      - name: Package
+        run: npx electron-builder ${{ matrix.target }} --publish never
+
+      - name: Check the packaged app starts
+        run: |
+          LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/smoke2.txt" "${{ matrix.smoke }}" || true
+          cat smoke2.txt && grep -q "SMOKE OK" smoke2.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ledger-${{ runner.os }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+          if-no-files-found: error
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe

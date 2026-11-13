@@ -56,8 +56,24 @@ const id = (params: Record<string, string>) => {
   return n;
 };
 
+// ---------- Desktop app ----------
+/** What the desktop app (Electron) lets the UI do. Absent when running with `npm start`. */
+export interface DesktopHost {
+  version: string;
+  platform: string;
+  dataDir: string;
+  /** Store the Trading 212 key in the system keychain (never the database) and use it from now on. */
+  saveT212Key(key: string, secret: string): void;
+  clearT212Key(): void;
+  openDataFolder(): void;
+  relaunch(): void;
+}
+let desktop: DesktopHost | null = null;
+const needDesktop = () => { if (!desktop) throw new ValidationError('Only available in the desktop app'); return desktop; };
+
 // ---------- Meta ----------
 route('GET', '/api/meta', ({ db }) => ({
+  desktop: desktop ? { version: desktop.version, platform: desktop.platform, dataDir: desktop.dataDir } : null,
   accountTypes: ACCOUNT_TYPES,
   presets: PRESETS.map((p) => ({ id: p.id, label: p.label, note: p.note })),
   months: monthsWithData(db),
@@ -290,6 +306,21 @@ route('POST', '/api/payday/items', ({ db, body }) => ({ id: addPaydayItem(db, bo
 route('DELETE', '/api/payday/items/:id', ({ db, params }) => { deletePaydayItem(db, id(params)); return { ok: true }; });
 route('GET', '/api/investing', ({ db }) => portfolio(db));
 route('GET', '/api/investing/holding/:ticker', ({ db, params }) => holdingDetail(db, params.ticker));
+route('POST', '/api/t212/key', ({ db, body }) => {
+  const host = needDesktop();
+  const key = typeof body?.key === 'string' ? body.key.trim() : '';
+  const secret = typeof body?.secret === 'string' ? body.secret.trim() : '';
+  if (!key || !secret) throw new ValidationError('Enter both the API key and the secret');
+  if (key.length > 400 || secret.length > 400 || /\s/.test(key + secret)) throw new ValidationError("That doesn't look like a Trading 212 key");
+  host.saveT212Key(key, secret);
+  const config = trading212Config();
+  let started = false;
+  if (config && syncedAccounts(db).length) { try { startSync(db, config); started = true; } catch { /* already running */ } }
+  return { configured: config !== null, started };
+});
+route('DELETE', '/api/t212/key', () => { needDesktop().clearT212Key(); return { configured: trading212Config() !== null }; });
+route('POST', '/api/desktop/open-data', () => { needDesktop().openDataFolder(); return { ok: true }; });
+route('POST', '/api/desktop/relaunch', () => { const host = needDesktop(); setTimeout(() => host.relaunch(), 150); return { ok: true }; });
 route('GET', '/api/t212/status', ({ db }) => syncStatus(db, trading212Config()));
 route('POST', '/api/t212/sync', ({ db, body }) => { startSync(db, trading212Config(), {}, { force: body?.force === true }); return { ok: true }; });
 route('GET', '/api/isa', ({ db }) => isaAllowanceSummary(db));
@@ -328,7 +359,8 @@ route('DELETE', '/api/skipped/:id', ({ db, params }) => { dismissSkipped(db, id(
 route('DELETE', '/api/imports/:id', ({ db, params }) => { undoImport(db, id(params)); return { ok: true }; });
 
 // ---------- Backup ----------
-export function createApp(db: DB, opts: { staticDir?: string; backupDir: string; dbFile?: string }) {
+export function createApp(db: DB, opts: { staticDir?: string; backupDir: string; dbFile?: string; desktop?: DesktopHost }) {
+  desktop = opts.desktop ?? null;
   route('POST', '/api/backup', () => ({ file: backup(db, opts.backupDir) }));
   // Clear everything synced from Trading 212 (after a backup) and download it again with the current key.
   route('POST', '/api/t212/reset', () => {
