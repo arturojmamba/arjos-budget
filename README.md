@@ -1,154 +1,98 @@
-# arjos-budget
+# Ledger
 
-A local-first personal finance app. It runs on your own computer, keeps everything in one SQLite file and talks to nothing except (optionally) Trading 212 for read-only investment data. There's no account to sign up for, no cloud and no tracking.
+A personal finance app that runs on your own computer. Your data stays in one file on your machine: no account, no cloud, no tracking.
 
-Built for UK banking: pay arrives on the last working day of the month and funds the month after, England & Wales bank holidays are built in, and the ISA tax year runs 6 April to 5 April.
+Made for UK banking: pay on the last working day funds the next month, bank holidays are built in, and the ISA year runs April to April.
 
-## Features
+## What it does
 
-**Everyday**
-- **Transactions:** a double-entry ledger underneath, so transfers between your own accounts are never counted as spending or income. Search, filters, notes and CSV export.
-- **Import:** CSV import with presets for Lloyds, Amex, Chase and Starling (others can be mapped by hand), plus duplicate detection, transfer matching and auto-categorise rules. Rules are suggested from your history and can be tested before saving. With no rule or history yet, a built-in list of about 600 UK merchants and tell-tale words suggests a category (McDonald's → Eating Out, TfL → Transport, Zara → Clothing or Shopping), using your own category names where they exist. It runs offline.
-- **Bills and income:** bills, subscriptions, regular savings and expected income. Payments are matched automatically, with price-rise alerts and shared bills (people who pay you back for their part).
+- **Import bank statements** (Lloyds, Amex, Chase, Starling, or any CSV) and categorise them automatically
+- **Track bills and income**, with price-rise alerts and shared bills
+- **Plan payday:** cover bills, set budgets, move money to goals
+- **Budgets, savings goals and debts**, with payoff plans
+- **Investing** via Trading 212 (read-only): returns, fees and your ISA allowance
+- **Reports:** where the money went, week by week or year by year
+- **Passcode lock**, with Touch ID on Mac
 
-**Planning**
-- **Payday:** a six-step routine for when pay lands: check the pay, cover the bills, set budgets, move money to goals and debts, keep a buffer, and add your own steps. Moves tick themselves off on the next import.
-- **Budgets:** weekly, monthly or yearly, across one or more categories, as fixed amounts or a percentage of take-home pay. Includes pace, rollover, warnings, suggestions from your spending and a 50/30/20 view.
-- **Goals:** savings goals in any account or pot, an emergency-fund view (months of essentials covered) and monthly targets.
+## Get the app
 
-**Wealth**
-- **Accounts:** current accounts, credit cards, savings, pots and investments, plus the ISA allowance at a glance.
-- **Investing:** Trading 212 sync covering holdings, pies, orders, dividends and value history, organised in three tabs:
-  - **Performance:** a money-weighted return, where the return came from (holdings, sales, dividends, currency), fees, and results by pie and by holding, sold ones included.
-  - **ISA allowance:** flexible-ISA rules (withdrawals can go back in without using allowance), the amount per month needed to fill it, and each deposit matched to the bank transfer that paid for it, with money moved from savings labelled as such.
-- **Debts:** APR, promotional rates, card-style or fixed minimums, payoff dates and interest, with snowball vs avalanche.
-- **Reports:** interactive charts with hover, drill-down and toggles, covering spending trends, where the money went, income vs outgoings, and a year in review.
+Download the latest version from the [Releases page](https://github.com/arturojmamba/arjos-budget/releases/latest):
 
-**Housekeeping**
-- **Data health:** stale imports, uncategorised transactions, likely duplicates and overdue bills.
-- **Backups:** daily backups, a backup before every upgrade, plus downloadable backups and restore.
-- **Settings:** personalisation, a hide-amounts switch, light and dark themes, and keyboard shortcuts.
-- **Passcode lock:** optional. The app opens on a lock screen with your picture and name and won't answer until the passcode is entered (Touch ID works too in the Mac app). Every launch starts locked, and it locks itself after a stretch without use (15 minutes by default; choose up to 1 hour 30 in Settings → Passcode). Lock any time from the sidebar or with ⌘L in the desktop app. The passcode is kept only as a salted hash in `lock.json` next to the database (not in it, so backups never carry it); forgot it? Quit and delete that file. It's a privacy lock, not encryption of the data file.
+| You have | Download |
+|---|---|
+| Mac with Apple chip (M1 or later) | `Ledger-…-mac-arm64.dmg` |
+| Older Intel Mac | `Ledger-…-mac-x64.dmg` |
+| Windows | `Ledger-Setup-….exe` |
 
-## Desktop app (Mac and Windows)
+**First open.** The app isn't paid-signed, so your computer warns you once:
 
-The same app as a normal desktop app: no Node, npm or Terminal needed.
+- **Mac:** drag Ledger into Applications and open it. When macOS blocks it, go to System Settings → Privacy & Security and click **Open Anyway**.
+- **Windows:** on "Windows protected your PC", click **More info → Run anyway**.
 
-**Download:** Mac (`Ledger-…-mac-arm64.dmg` for Apple Silicon, `…-x64.dmg` for Intel) or Windows (`Ledger-Setup-….exe`), from the repository's Releases page or as a file shared with you.
-
-**First open.** The app isn't signed with a paid Apple or Microsoft certificate, so the system warns you once:
-- **Mac:** open the .dmg and drag Ledger to Applications. Open it once; when macOS says it can't check it, go to System Settings → Privacy & Security, scroll down, and click **Open Anyway**. If it says the app is "damaged", run `xattr -dr com.apple.quarantine /Applications/Ledger.app` in Terminal once.
-- **Windows:** if SmartScreen says "Windows protected your PC", click **More info → Run anyway**.
-
-**Your data** lives in the system's app-data folder (Mac: `~/Library/Application Support/Ledger/data`, Windows: `%APPDATA%\Ledger\data`), with daily backups in its `backups` folder. On first launch you can start fresh or bring in an existing database (for example `data/finance.db` from running it with `npm start`). Settings → Data → *Show in Finder/Explorer* opens the folder.
-
-**Trading 212:** add the API key in Settings → Trading 212. It's encrypted with the system keychain and kept in the app-data folder, never in the database or backups.
-
-On a Mac, closing the window keeps the app running (so syncing carries on); quit with ⌘Q.
-
-**Updates (1.2 and later):** the app checks the GitHub releases when it opens and once a day, downloads a new version in the background and checks it against the SHA-256 GitHub publishes, then shows **Restart to update**. It backs up first, swaps the app in place (Mac: in Applications; Windows: a silent reinstall) and reopens; your data isn't touched. Settings → About & updates has *Check for updates* and a switch for automatic checks. If it can't update in place (for example it's running from the disk image), it says why and offers the installer.
-
-**Building it yourself:**
-```bash
-npm install
-npm run desktop        # run it from source in a window
-npm run desktop:mac    # → release/Ledger-<version>-mac-<arch>.dmg (needs a Mac)
-npm run desktop:win    # → release/Ledger-Setup-<version>.exe (needs Windows)
-```
-**Releasing:** bump `version` in package.json, then **Actions → Desktop app → Run workflow** with that version (e.g. `v1.2.1`) and optional notes (separated by `;`; otherwise the changes since the last release). Each build checks the packaged app starts before it's published, and after a release GitHub's Mac and Windows machines install the previous version and let it update itself to the new one.
-
-## Run it from source
-
-Requires Node 22.13 or newer (Node 24 recommended).
-
-```bash
-npm install
-npm start            # builds the UI and serves it on http://localhost:4545
-```
-
-The server listens on `127.0.0.1` only, so nothing else on your network can reach it. Change the port with `PORT=5000 npm start`.
-
-For development:
-
-```bash
-npm run dev          # rebuilds the UI and restarts the server on change
-npm test             # financial-rule, importer and sync tests
-npm run typecheck
-npm run backup       # one-off backup
-```
-
-## Demo data
-
-To try the app or take screenshots without your own data, build a demo database full of made-up data: a fictional person, employer, banks, shops and funds, with a year of transactions, bills, budgets, goals, a loan and a Trading 212 ISA.
-
-```bash
-npm run demo         # writes data/demo.db (your own data/finance.db is not touched)
-npm run start:demo   # serves it on http://localhost:4546, with Trading 212 shown as connected but not syncing
-```
-
-Set `T212_SYNC=off` to pause automatic Trading 212 syncing in general.
-
-## Trading 212 (optional)
-
-Copy `.env.example` to `.env` and add an API key from Trading 212 (Settings → API):
-
-```bash
-cp .env.example .env
-```
-
-Give the key **read-only permissions** (account data, portfolio, history). The app only ever sends `GET` requests and contains no code that places, edits or cancels orders. It syncs on start, every 6 hours, and when you press *Sync now*. If a sync fails, the last known data is kept.
-
-`.env` is git-ignored. Keys are never stored in the database or shown in the UI.
+**Updates are automatic.** When a new version is out, a banner says **Restart to update**. Click it and you're done. Your data is backed up first and never touched.
 
 ## Your data
 
-| What | Where |
+- Everything is saved on your computer, with a backup every day.
+  - Mac: `~/Library/Application Support/Ledger/data`
+  - Windows: `%APPDATA%\Ledger\data`
+- Settings → Data opens that folder, and lets you download or restore a backup.
+- Your Trading 212 key is encrypted with the system keychain and never saved in the data file.
+- **Forgot your passcode?** Quit the app and delete `lock.json` in the data folder.
+
+## Trading 212 (optional)
+
+In Trading 212, go to Settings → API and create a key with **read-only** permissions. Paste it into Ledger under Settings → Trading 212.
+
+Ledger only reads your account. It has no code that can place or cancel orders.
+
+---
+
+## For developers
+
+### Run from source
+
+Needs Node 22.13 or newer.
+
+```bash
+npm install
+npm start          # http://localhost:4545
+```
+
+For Trading 212, copy `.env.example` to `.env` and add your key there. Your data goes in `data/`. Both are git-ignored.
+
+### Useful commands
+
+```bash
+npm run dev        # rebuild and restart on change
+npm test           # run the tests
+npm run demo       # make a database of made-up data
+npm run start:demo # open it on http://localhost:4546
+npm run desktop    # run the desktop app from source
+```
+
+### Releasing a new version
+
+1. Bump `version` in `package.json` and push.
+2. On GitHub, go to **Actions → Desktop app → Run workflow**. Enter the version (for example `v1.3.0`) and, optionally, notes separated by `;`.
+
+It runs the tests, builds the Mac and Windows apps, checks they start, and publishes the release. Then it checks that the previous version updates itself to the new one.
+
+### How the money is counted
+
+- Amounts are whole pence, never decimals.
+- Every transaction balances to zero, so moving money between your own accounts is never counted as spending.
+- Budgets and reports follow pay cycles, not calendar months.
+- Investment growth is never counted as income.
+
+### Where things are
+
+| Folder | What's in it |
 |---|---|
-| Database | `data/finance.db` (override with `FINANCE_DB`) |
-| Backups | `data/backups/`, daily (last 30 kept) and before every upgrade or restore (override with `FINANCE_BACKUPS`) |
-| Secrets | `.env` |
+| `server/` | the database, money rules, importers, Trading 212 sync and API |
+| `web/` | the React interface |
+| `electron/` | the desktop app: window, menus, keychain and updates |
+| `tests/` | tests, using made-up data only |
+| `scripts/` | build, backup and demo data |
 
-`data/`, `.env` and all `*.db` files are git-ignored, so none of your financial data or keys can end up in the repository.
-
-## How the money is counted
-
-- Amounts are stored as whole pence; no floating-point money.
-- Every transaction is a set of postings that sum to zero. A transfer is one posting out and one in, so it never shows as spending.
-- **Saved** counts transfers from an everyday account into savings, pots or investments. Moving money between two savings accounts isn't counted twice.
-- **Periods:** pay on the last working day funds the next month, so budgets and reports follow pay cycles rather than calendar months.
-- **Investment growth** is the difference between an account's value and what was paid in. It's never counted as income.
-
-## Project layout
-
-```
-server/
-  index.ts         `npm start`: .env loading, then start.ts
-  start.ts         startup shared with the desktop app: restore, backups, scheduled sync, server
-  db.ts            schema + migrations (node:sqlite, no native dependencies)
-  ledger.ts        transaction rules and validation
-  queries.ts       balances, lists, monthly summary
-  importers/       CSV parser, bank presets, matching, categorisation
-  recurring.ts     bills, subscriptions, savings, income, monthly plan
-  shares.ts        shared bills and pay-backs
-  payday.ts        payday routine
-  budgets.ts       budgets, rollover, pace, suggestions
-  goals.ts         savings goals
-  debts.ts         debts and payoff simulation
-  investments.ts   valuations, tax year helpers
-  t212.ts          Trading 212 sync (read-only)
-  investing.ts     holdings, pies, activity
-  performance.ts   returns (XIRR, Modified Dietz), breakdown, costs
-  isa.ts           flexible ISA allowance and bank matching
-  insights.ts      report data
-  reports.ts       year in review
-  health.ts        data health checks
-  app.ts           JSON API
-web/               React UI, bundled with esbuild
-electron/          desktop app (window, menus, data folder, keychain), bundled to dist-electron/
-tests/             node:test suites
-scripts/           build and backup
-```
-
-## Keyboard shortcuts
-
-Press `?` anywhere. `N` new transaction · `H` hide amounts · `/` search · `G` then a letter to jump between pages (`O` overview, `T` transactions, `P` payday, `B` budgets, `G` goals, `I` bills, `D` debts, `R` reports, `V` investing, `A` accounts, `C` categories, `M` import, `S` settings).
+Press `?` in the app to see the keyboard shortcuts.
