@@ -6,6 +6,7 @@ import { createTransaction, isLiability, normaliseMerchant, type Kind } from '..
 import { parseCsv } from './csv.ts';
 import { PRESETS, applyMapping, detectPreset, findHeaderRow, guessMapping, type Mapping, type RawRow } from './presets.ts';
 import { loadRules, suggest } from './categorise.ts';
+import { smartCategory } from './smart.ts';
 
 const MATCH_WINDOW_DAYS = 4;
 
@@ -28,7 +29,9 @@ export interface PreviewRow {
   kind: Kind;
   categoryId: number | null;
   transferAccountId: number | null;
-  suggestionSource: 'rule' | 'history' | 'match' | 'none';
+  suggestionSource: 'rule' | 'history' | 'smart' | 'match' | 'none';
+  /** For smart suggestions: the word that matched (e.g. "mcdonald"). */
+  smartMatch?: string;
 }
 
 export interface PreviewResult {
@@ -165,8 +168,14 @@ export function previewImport(db: DB, input: PreviewInput): PreviewResult {
         transferAccountId = hinted;
       }
     }
+    // 5. No rule, no history, not a transfer: a well-known merchant or tell-tale word.
+    let smartMatch: string | undefined;
+    if (source === 'none' && kind !== 'transfer' && !categoryId) {
+      const smart = smartCategory(db, sugg.description, r.amount);
+      if (smart) { kind = smart.kind; categoryId = smart.categoryId; source = 'smart'; smartMatch = smart.matched; }
+    }
     rows.push({
-      ...base, description: sugg.description, hash, status: 'new', action: 'create', kind, categoryId, transferAccountId, suggestionSource: source,
+      ...base, description: sugg.description, hash, status: 'new', action: 'create', kind, categoryId, transferAccountId, suggestionSource: source, smartMatch,
     });
   }
 

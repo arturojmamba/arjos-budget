@@ -12,7 +12,7 @@ interface Row {
   index: number; date: string | null; description: string; bankDescription: string; amount: number | null; balance: number | null; hash: string | null;
   status: 'new' | 'duplicate' | 'possible_duplicate' | 'transfer_match' | 'error'; error?: string;
   match?: { transactionId: number; postingId: number; date: string; description: string; accountName: string };
-  action: Action; kind: Kind; categoryId: number | null; transferAccountId: number | null; suggestionSource: string; remember?: boolean;
+  action: Action; kind: Kind; categoryId: number | null; transferAccountId: number | null; suggestionSource: string; smartMatch?: string; remember?: boolean;
   /** Category copied from the row with this index (same place). Changing that row again updates this one too. */
   filledFrom?: number | null;
   /** Edited during this import: stays in "Needs attention" so a misclick can still be put right. */
@@ -99,8 +99,11 @@ export function Import() {
         // re-applies to the rows it filled in earlier, so a misclick can be corrected by picking again.
         // Categories from your rules or history, and rows you changed yourself, are left alone.
         const copiedFromHere = r.filledFrom === index;
-        const sameUncategorised = r.status === 'new' && r.action === 'create' && r.suggestionSource === 'none' && r.kind === target.kind && !r.categoryId
+        const samePlace = r.status === 'new' && r.action === 'create' && r.kind === target.kind
           && merchantKey(r.description) === key && Math.sign(r.amount ?? 0) === Math.sign(target.amount ?? 0);
+        // Rows with no category yet, or with the same smart guess you're correcting.
+        const sameUncategorised = samePlace && ((r.suggestionSource === 'none' && !r.categoryId)
+          || (r.suggestionSource === 'smart' && target.suggestionSource === 'smart' && r.categoryId === target.categoryId));
         if (copiedFromHere && r.action === 'create' && r.kind === target.kind) return { ...r, ...patch, remember: false, touched: true };
         if (sameUncategorised) return { ...r, ...patch, remember: false, touched: true, filledFrom: index };
         return r;
@@ -315,11 +318,12 @@ function ImportRow({ r, accountId, onChange, source }: { r: Row; accountId: numb
               </span>
             ) : (
               <span className={!r.categoryId ? 'needs-soft' : ''}>
-                <CategorySelect kind={r.kind as 'expense' | 'income'} value={r.categoryId} onChange={(v) => onChange(r.index, { categoryId: v, suggestionSource: r.suggestionSource }, true)} />
+                <CategorySelect kind={r.kind as 'expense' | 'income'} value={r.categoryId} onChange={(v) => onChange(r.index, { categoryId: v, suggestionSource: r.suggestionSource === 'smart' ? 'none' : r.suggestionSource }, true)} />
               </span>
             ))}
             {r.suggestionSource === 'rule' && <Badge tone="info">Rule</Badge>}
             {r.suggestionSource === 'history' && <Badge>Like last time</Badge>}
+            {r.suggestionSource === 'smart' && r.filledFrom == null && <span title={`Recognised “${r.smartMatch ?? r.description}”. Change it if it's wrong; tick Remember to make it a rule.`}><Badge>Suggested</Badge></span>}
             {source && r.categoryId ? <span className="muted tiny" title="Copied from another row for the same place. Change that row to change them all, or this one to change only this row.">same as {source.date ? shortDate(source.date) : 'another row'}</span> : null}
           </div>
         )}

@@ -13,6 +13,8 @@ import {
 import { healthChecks } from './health.ts';
 import { getAppearance, getProfile, saveAppearance, saveProfile, saveAvatar } from './personal.ts';
 import { suggestRules, createRules } from './rulesuggest.ts';
+import { loadRules, suggest } from './importers/categorise.ts';
+import { smartCategory } from './importers/smart.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS } from './db.ts';
 import { trends, merchants, explore, compare, netWorthHistory, yearReview, reportYears } from './reports.ts';
@@ -180,6 +182,19 @@ route('GET', '/api/export/transactions.csv', ({ db, query }) => {
 // ---------- Rules ----------
 route('GET', '/api/rules', ({ db }) => listRules(db));
 route('GET', '/api/rules/suggestions', ({ db }) => suggestRules(db));
+/** A category for a description you're typing: your rules, then last time, then the built-in merchant list. */
+route('GET', '/api/categorise/suggest', ({ db, query }) => {
+  const description = (query.get('description') ?? '').trim();
+  const amount = Number(query.get('amount')) || -1;
+  const accountId = int(query.get('accountId'));
+  if (description.length < 2) return { categoryId: null, source: 'none' };
+  if (accountId) {
+    const s = suggest(db, loadRules(db), accountId, description, amount);
+    if (s.categoryId && s.kind !== 'transfer') return { categoryId: s.categoryId, kind: s.kind, source: s.source };
+  }
+  const smart = smartCategory(db, description, amount);
+  return smart ? { categoryId: smart.categoryId, kind: smart.kind, source: 'smart', matched: smart.matched } : { categoryId: null, source: 'none' };
+});
 route('POST', '/api/rules/bulk', ({ db, body }) => createRules(db, body?.items, body?.fillIn !== false));
 route('POST', '/api/rules', ({ db, body }) => ({ id: createRule(db, body) }));
 route('PUT', '/api/rules/:id', ({ db, params, body }) => { updateRule(db, id(params), body); return { ok: true }; });

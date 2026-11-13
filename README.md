@@ -8,7 +8,7 @@ Built for UK banking: pay arrives on the last working day of the month and funds
 
 **Everyday**
 - **Transactions:** a double-entry ledger underneath, so transfers between your own accounts are never counted as spending or income. Search, filters, notes and CSV export.
-- **Import:** CSV import with presets for Lloyds, Amex, Chase and Starling (others can be mapped by hand), plus duplicate detection, transfer matching and auto-categorise rules. Rules are suggested from your history and can be tested before saving.
+- **Import:** CSV import with presets for Lloyds, Amex, Chase and Starling (others can be mapped by hand), plus duplicate detection, transfer matching and auto-categorise rules. Rules are suggested from your history and can be tested before saving. With no rule or history yet, a built-in list of about 600 UK merchants and tell-tale words suggests a category (McDonald's → Eating Out, TfL → Transport, Zara → Clothing or Shopping), using your own category names where they exist. It runs offline.
 - **Bills and income:** bills, subscriptions, regular savings and expected income. Payments are matched automatically, with price-rise alerts and shared bills (people who pay you back for their part).
 
 **Planning**

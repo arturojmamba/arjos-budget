@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { api, type Transaction } from '../api.ts';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api, qs, type Transaction } from '../api.ts';
 import { parseAmount, penceToInput, monthLabel, addMonths, looksLikeTransfer } from '../format.ts';
 import { AccountSelect, CategorySelect, Field, Modal, Segmented, useApp, useConfirm } from './ui.tsx';
 import { Icon } from './Icon.tsx';
@@ -38,6 +38,9 @@ export function TransactionForm({ transaction, onClose, defaults }: {
   const [toAccountId, setToAccountId] = useState<number | null>(existing?.toAccountId ?? null);
   const [categoryId, setCategoryId] = useState<number | null>(existing?.categoryId ?? null);
   const [refund, setRefund] = useState(existing?.refund ?? false);
+  // A category suggested from the description (rules, last time, or well-known merchants) until you pick one yourself.
+  const [suggested, setSuggested] = useState<{ categoryId: number; source: string } | null>(null);
+  const [picked, setPicked] = useState(!!existing?.categoryId);
   const [notes, setNotes] = useState(transaction?.notes ?? '');
   const [period, setPeriod] = useState<string>(transaction && transaction.period !== transaction.date.slice(0, 7) ? transaction.period : '');
   const [showMore, setShowMore] = useState(!!period || !!transaction?.notes);
@@ -45,6 +48,21 @@ export function TransactionForm({ transaction, onClose, defaults }: {
   const [saving, setSaving] = useState(false);
 
   const isTransfer = mode === 'transfer' || mode === 'repayment';
+
+  useEffect(() => {
+    if (transaction || picked || isTransfer) return;
+    const d = description.trim();
+    if (d.length < 2) { if (suggested) { setSuggested(null); setCategoryId(null); } return; }
+    const signed = mode === 'income' ? 1 : refund ? 1 : -1;
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.get<{ categoryId: number | null; kind?: string; source: string }>(`/api/categorise/suggest${qs({ description: d, amount: signed, accountId: accountId ?? undefined })}`);
+        if (r.categoryId && r.kind === mode) { setSuggested({ categoryId: r.categoryId, source: r.source }); setCategoryId(r.categoryId); }
+        else if (suggested) { setSuggested(null); setCategoryId(null); }
+      } catch { /* a suggestion is optional */ }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [description, mode, accountId, refund, picked]); // eslint-disable-line
   const month = date.slice(0, 7);
 
   async function save(e: React.FormEvent) {
@@ -116,7 +134,7 @@ export function TransactionForm({ transaction, onClose, defaults }: {
       <form id="txn-form" onSubmit={save} className="form">
         <Segmented<Mode>
           value={mode}
-          onChange={(m) => { setMode(m); setCategoryId(null); if (m === 'repayment') setToAccountId(null); }}
+          onChange={(m) => { setMode(m); setCategoryId(null); setPicked(false); setSuggested(null); if (m === 'repayment') setToAccountId(null); }}
           options={[
             { value: 'expense', label: 'Expense' },
             { value: 'income', label: 'Income' },
@@ -150,7 +168,10 @@ export function TransactionForm({ transaction, onClose, defaults }: {
           </Field>
         ) : (
           <Field label="Category">
-            <CategorySelect kind={mode as 'expense' | 'income'} value={categoryId} onChange={setCategoryId} />
+            <CategorySelect kind={mode as 'expense' | 'income'} value={categoryId} onChange={(v) => { setCategoryId(v); setPicked(true); setSuggested(null); }} />
+            {suggested && suggested.categoryId === categoryId && (
+              <span className="muted tiny">{suggested.source === 'rule' ? 'From your rules' : suggested.source === 'history' ? 'Like last time' : 'Suggested from the name'}. Change it if it's wrong.</span>
+            )}
           </Field>
         )}
         {mode === 'expense' && categoryId != null && looksLikeTransfer(categories.find((c) => c.id === categoryId)?.name ?? '') && (
