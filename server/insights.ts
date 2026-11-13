@@ -6,6 +6,7 @@
  *  - budgetRecord: how each budget has gone, month by month, and whether the limit is realistic.
  *  - cashFlow: in, out, saved, and how your money runs down from payday to payday.
  *  - compareDrivers: two periods, and which categories and places made the difference.
+ *  - weekly: one Monday-to-Sunday week, against the week before and a typical week.
  *
  * Money is pence. Whole-month ranges use the month a transaction counts towards
  * (salary on the last working day funds the next month), as everywhere else.
@@ -14,8 +15,8 @@ import { type DB } from './db.ts';
 import { ValidationError } from './money.ts';
 import { addDays, addMonths, daysBetween, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
 import { type Range, byCategory, compare, merchantKey, monthEnd, monthsIn, rangeWhere, totals, trends } from './reports.ts';
-import { listRecurring } from './recurring.ts';
-import { budgetView } from './budgets.ts';
+import { listRecurring, occurrences } from './recurring.ts';
+import { budgetView, budgetCategoryIds, listBudgets } from './budgets.ts';
 
 /** Categorical colours for things without their own colour (places, subcategories), in a fixed order. */
 const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
@@ -435,6 +436,114 @@ export function compareDrivers(db: DB, a: Range, b: Range) {
   }).filter((p) => p.diff !== 0).sort((p, q) => Math.abs(q.diff) - Math.abs(p.diff)).slice(0, 12);
   const daysA = daysBetween(a.from, a.to) + 1, daysB = daysBetween(b.from, b.to) + 1;
   return { ...base, places, days: { a: daysA, b: daysB }, perDay: { a: Math.round(base.a.spending / daysA), b: Math.round(base.b.spending / daysB) } };
+}
+
+// ---------------------------------------------------------------------------
+// Weekly summary: Monday to Sunday
+
+/** The Monday of the week a date falls in. */
+export function weekStart(date: string): string {
+  const dow = new Date(`${date}T12:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(date, -((dow + 6) % 7));
+}
+
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/**
+ * One week, Monday to Sunday. Compared with the week before (for the current week: the same days of it,
+ * so a Wednesday isn't measured against a whole week) and with a typical week (the average of the
+ * 8 full weeks before). "Day-to-day" leaves out fixed categories such as rent and bills, which land
+ * in whichever week they're due and would swamp the comparison.
+ */
+export function weekly(db: DB, week?: string | null, today = todayIso()) {
+  if (week != null && !isIsoDate(week)) throw new ValidationError('Choose a valid week');
+  const thisWeek = weekStart(today);
+  const from = week ? weekStart(week) : thisWeek;
+  if (from > thisWeek) throw new ValidationError("That week hasn't started yet");
+  const to = addDays(from, 6);
+  const current = from === thisWeek;
+  const upTo = current ? today : to; // the last day with data
+  const elapsed = daysBetween(from, upTo) + 1;
+
+  const rows = expenseRows(db, { from, to: upTo });
+  const prevFrom = addDays(from, -7);
+  const prevAll = expenseRows(db, { from: prevFrom, to: addDays(from, -1) });
+  const prevSame = prevAll.filter((r) => r.date <= addDays(prevFrom, elapsed - 1));
+  const spent = (rs: Row[]) => sum(rs.map((r) => r.amount));
+  const dayToDay = (rs: Row[]) => sum(rs.filter((r) => !r.fixed).map((r) => r.amount));
+
+  // A typical week: the 8 full weeks before this one.
+  const histFrom = addDays(from, -56);
+  const hist = expenseRows(db, { from: histFrom, to: addDays(from, -1) });
+  const firstTx = (db.prepare("SELECT MIN(date) AS d FROM transactions WHERE kind = 'expense'").get() as { d: string | null }).d;
+  const weeksOfHistory = firstTx ? Math.max(0, Math.min(8, Math.floor(daysBetween(firstTx > histFrom ? weekStart(addDays(firstTx, 6)) : histFrom, from) / 7))) : 0;
+  const typical = weeksOfHistory > 0
+    ? { spent: Math.round(spent(hist.filter((r) => r.date >= addDays(from, -7 * weeksOfHistory))) / weeksOfHistory),
+        dayToDay: Math.round(dayToDay(hist.filter((r) => r.date >= addDays(from, -7 * weeksOfHistory))) / weeksOfHistory), weeks: weeksOfHistory }
+    : null;
+
+  const t = totals(db, { from, to: upTo });
+
+  // Days, stacked by category (top 6 + the rest), as on the spending explorer.
+  const catTotals = new Map<string, { id: number | null; name: string; colour: string; icon: string | null; fixed: boolean; total: number; count: number }>();
+  for (const r of rows) {
+    const k = String(r.topId);
+    const c = catTotals.get(k) ?? { id: r.topId, name: r.topName, colour: r.topColour, icon: r.topIcon, fixed: !!r.fixed, total: 0, count: 0 };
+    c.total += r.amount; c.count++; catTotals.set(k, c);
+  }
+  const prevCat = new Map<string, number>();
+  for (const r of current ? prevSame : prevAll) prevCat.set(String(r.topId), (prevCat.get(String(r.topId)) ?? 0) + r.amount);
+  const ranked = [...catTotals.entries()].sort((a, b) => b[1].total - a[1].total);
+  const shown = ranked.slice(0, 6).map(([k]) => k);
+  const dates = Array.from({ length: 7 }, (_, i) => addDays(from, i));
+  const series = [
+    ...ranked.slice(0, 6).map(([k, c]) => ({ key: k, label: c.name, colour: c.colour, values: dates.map((d) => sum(rows.filter((r) => r.date === d && String(r.topId) === k).map((r) => r.amount))) })),
+    ...(ranked.length > 6 ? [{ key: 'other', label: 'Everything else', colour: OTHER, values: dates.map((d) => sum(rows.filter((r) => r.date === d && !shown.includes(String(r.topId))).map((r) => r.amount))) }] : []),
+  ];
+  const days = dates.map((d, i) => {
+    const rs = rows.filter((r) => r.date === d);
+    return { date: d, label: DAY_SHORT[i], spent: spent(rs), count: rs.length, future: d > upTo, today: d === today };
+  });
+
+  const categories = [...new Set([...catTotals.keys(), ...prevCat.keys()])].map((k) => {
+    const c = catTotals.get(k);
+    const prev = prevCat.get(k) ?? 0;
+    const any = c ?? (() => { const r = (current ? prevSame : prevAll).find((x) => String(x.topId) === k)!; return { id: r.topId, name: r.topName, colour: r.topColour, icon: r.topIcon, fixed: !!r.fixed, total: 0, count: 0 }; })();
+    return { categoryId: any.id, name: any.name, colour: any.colour, icon: any.icon, fixed: any.fixed, total: c?.total ?? 0, count: c?.count ?? 0, previous: prev, change: (c?.total ?? 0) - prev };
+  }).filter((c) => c.total !== 0 || c.previous !== 0).sort((a, b) => b.total - a.total || b.previous - a.previous);
+
+  const placeMap = new Map<string, { total: number; count: number; colour: string; category: string }>();
+  for (const r of rows) { const k = merchantKey(r.merchant); const p = placeMap.get(k) ?? { total: 0, count: 0, colour: r.topColour, category: r.topName }; p.total += r.amount; p.count++; placeMap.set(k, p); }
+  const places = [...placeMap.entries()].map(([k, p]) => ({ merchant: k, label: placeLabel(k), ...p })).filter((p) => p.total > 0).sort((a, b) => b.total - a.total).slice(0, 8);
+
+  const biggest = rows.filter((r) => r.amount > 0).sort((a, b) => b.amount - a.amount).slice(0, 5)
+    .map((r) => ({ id: r.id, date: r.date, description: r.description, merchant: merchantKey(r.merchant), label: placeLabel(merchantKey(r.merchant)), category: r.catName ?? r.topName, colour: r.topColour, amount: r.amount }));
+
+  // Bills due this week, and what's coming next week.
+  const bill = (o: ReturnType<typeof occurrences>[number]) => ({ recurringId: o.recurringId, name: o.name, type: o.type, date: o.dueDate, amount: o.paidAmount ?? o.expected, status: o.status });
+  const bills = occurrences(db, from, to).filter((o) => o.type !== 'income').map(bill);
+  const nextWeek = current ? occurrences(db, addDays(to, 1), addDays(to, 7)).filter((o) => o.type !== 'income').map(bill) : [];
+
+  // Budgets: what went on each this week, and where it stands for its period.
+  // Budgets as they stood for this week: live for the current week; otherwise at the end of the month
+  // the week mostly falls in (a week's Thursday decides its month, as with ISO weeks).
+  const thursday = addDays(from, 3);
+  const ref = current ? today : monthOf(to) === monthOf(thursday) ? to : monthEnd(monthOf(thursday));
+  const budgets = listBudgets(db, monthOf(ref), ref).budgets.filter((b) => b.kind === 'spending' && !b.archived).map((b) => {
+    const ids = new Set(budgetCategoryIds(db, b.id));
+    const week = sum(rows.filter((r) => (r.catId != null && ids.has(r.catId)) || (r.topId != null && ids.has(r.topId))).map((r) => r.amount));
+    return { id: b.id, name: b.name, icon: b.icon, colour: b.colour, period: b.period, periodLabel: b.current.label, thisWeek: week, spent: b.spent, available: b.available, remaining: b.remaining, status: b.status };
+  }).filter((b) => b.thisWeek !== 0 || b.status !== 'ok');
+
+  return {
+    from, to, upTo, current, elapsed, isLastWeek: from === addDays(thisWeek, -7), isFirstWeek: !!firstTx && to < firstTx,
+    previousWeek: prevFrom, nextWeek: current ? null : addDays(from, 7),
+    spent: spent(rows), dayToDay: dayToDay(rows), fixed: spent(rows) - dayToDay(rows),
+    income: t.income, saved: t.saved, count: rows.length,
+    last: { spent: spent(current ? prevSame : prevAll), dayToDay: dayToDay(current ? prevSame : prevAll), sameDays: current, fullWeek: spent(prevAll) },
+    typical,
+    days, series, categories, places, biggest, bills, upcoming: nextWeek, budgets,
+  };
 }
 
 export { byCategory };

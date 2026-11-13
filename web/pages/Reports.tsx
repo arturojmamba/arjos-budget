@@ -7,9 +7,9 @@ import { LineChart, Spark, StackedBars, Waterfall, useHidden } from '../componen
 import { Icon } from '../components/Icon.tsx';
 import { navigate, setParams } from '../router.ts';
 
-type Tab = 'spending' | 'cashflow' | 'compare' | 'networth' | 'year';
+type Tab = 'week' | 'spending' | 'cashflow' | 'compare' | 'networth' | 'year';
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'spending', label: 'Spending' }, { value: 'cashflow', label: 'Cash flow' },
+  { value: 'week', label: 'This week' }, { value: 'spending', label: 'Spending' }, { value: 'cashflow', label: 'Cash flow' },
   { value: 'compare', label: 'Compare' }, { value: 'networth', label: 'Net worth' },
 ];
 /** Old links (trends, merchants, ask) still land somewhere sensible. */
@@ -26,12 +26,186 @@ export function Reports({ params }: { params: URLSearchParams }) {
         <span className="spacer" />
         {tab !== 'year' && <button className="btn btn-sm" onClick={() => go('year')} aria-label="Year in review"><Icon name="file" size={14} /> <span className="hide-sm-text">Year in review</span></button>}
       </div>
+      {tab === 'week' && <WeekTab week={params.get('week')} onWeek={(w) => go('week', { week: w })} />}
       {tab === 'spending' && <SpendingTab params={params} />}
       {tab === 'cashflow' && <CashFlow />}
       {tab === 'compare' && <CompareTab />}
       {tab === 'networth' && <NetWorth />}
       {tab === 'year' && <YearReview params={params} onChange={(kind, year) => go('year', { kind, year })} />}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// This week: Monday to Sunday, week by week
+
+interface WeekData {
+  from: string; to: string; upTo: string; current: boolean; elapsed: number; previousWeek: string; nextWeek: string | null; isLastWeek: boolean; isFirstWeek: boolean;
+  spent: number; dayToDay: number; fixed: number; income: number; saved: number; count: number;
+  last: { spent: number; dayToDay: number; sameDays: boolean; fullWeek: number };
+  typical: { spent: number; dayToDay: number; weeks: number } | null;
+  days: { date: string; label: string; spent: number; count: number; future: boolean; today: boolean }[];
+  series: { key: string; label: string; colour: string; values: number[] }[];
+  categories: { categoryId: number | null; name: string; colour: string; icon: string | null; fixed: boolean; total: number; count: number; previous: number; change: number }[];
+  places: { merchant: string; label: string; total: number; count: number; colour: string; category: string }[];
+  biggest: { id: number; date: string; description: string; merchant: string; label: string; category: string; colour: string; amount: number }[];
+  bills: { recurringId: number; name: string; type: string; date: string; amount: number; status: string }[];
+  upcoming: { recurringId: number; name: string; type: string; date: string; amount: number; status: string }[];
+  budgets: { id: number; name: string; icon: string | null; colour: string; period: string; periodLabel: string; thisWeek: number; spent: number; available: number; remaining: number; status: string }[];
+}
+
+const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const weekday = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long' });
+/** "£40 less than …" / "£40 more than …" / "the same as …". */
+function versus(now: number, then: number, what: string) {
+  const diff = now - then;
+  if (Math.abs(diff) < 100) return <>about the same as {what}</>;
+  return <><strong className={diff > 0 ? 'tone-bad' : 'tone-good'}>{money(Math.abs(diff))} {diff > 0 ? 'more' : 'less'}</strong> than {what}</>;
+}
+
+function WeekTab({ week, onWeek }: { week: string | null; onWeek: (w: string | null) => void }) {
+  const { data, error } = useData<WeekData>(() => api.get(`/api/reports/week${qs({ week: week ?? undefined })}`), [week]);
+  const [hidden, toggle, setHidden] = useHidden();
+  // Rent and bills land on one day and dwarf everything else: start with them hidden (click the key to show).
+  useEffect(() => {
+    if (data) setHidden(new Set(data.categories.filter((c) => c.fixed && c.total > 0).map((c) => String(c.categoryId))));
+  }, [data?.from]); // eslint-disable-line
+  if (error) return <Card><Empty icon="calendar" title="Can't show that week">{error}</Empty></Card>;
+  if (!data) return <div className="loading" />;
+  const range = { from: data.from, to: data.to };
+  const lastWeekStart = data.previousWeek;
+  const title = data.current ? 'This week' : data.isLastWeek ? 'Last week' : `Week of ${dayMonth(data.from)}`;
+  const lastLabel = data.current ? 'by this point last week' : 'the week before';
+  const typicalDay = data.typical ? Math.round(data.typical.dayToDay / 7) : null;
+  const maxCat = Math.max(1, ...data.categories.map((c) => Math.max(c.total, c.previous)));
+  const maxPlace = Math.max(1, ...data.places.map((p) => p.total));
+  const openDay = (i: number) => { const d = data.days[i]; if (!d.future) navigate(`/transactions${qs({ from: d.date, to: d.date, month: 'all' })}`); };
+  return (
+    <>
+      <div className="week-head">
+        <button className="btn btn-icon" aria-label="Previous week" onClick={() => onWeek(lastWeekStart)}><Icon name="chevron-left" size={16} /></button>
+        <div className="week-title">
+          <h2>{title}</h2>
+          <span className="muted small">Mon {dayMonth(data.from)} – Sun {dayMonth(data.to)} {data.to.slice(0, 4)}{data.current && data.elapsed < 7 ? ` · so far, up to ${weekday(data.upTo)}` : ''}</span>
+        </div>
+        <button className="btn btn-icon" aria-label="Next week" disabled={!data.nextWeek} onClick={() => data.nextWeek && onWeek(data.nextWeek)}><Icon name="chevron-right" size={16} /></button>
+        <span className="spacer" />
+        {!data.current && <button className="btn btn-sm" onClick={() => onWeek(null)}>This week</button>}
+      </div>
+
+      <p className="week-lede">
+        {data.count === 0 ? <>No spending recorded {data.current ? 'yet this week' : 'this week'}.</> : <>
+          {data.current ? "You've spent " : 'You spent '}<strong><Money value={data.spent} /></strong>{data.current ? ' so far this week' : ''}, {versus(data.spent, data.last.spent, lastLabel)}.
+          {data.typical && <> Day-to-day spending was <Money value={data.dayToDay} />, {versus(data.dayToDay, data.current ? Math.round(data.typical.dayToDay * data.elapsed / 7) : data.typical.dayToDay, data.current ? 'a typical week by now' : 'a typical week')}.</>}
+        </>}
+      </p>
+
+      <div className="stats">
+        <Stat label="Spent" value={<Money value={data.spent} />} sub={<>{money(data.last.spent)} {lastLabel}</>} />
+        <Stat label="Day-to-day" value={<Money value={data.dayToDay} />} sub={data.typical ? <>Typical week {money(data.typical.dayToDay)}</> : 'Leaves out bills and rent'} />
+        <Stat label="Bills and fixed costs" value={<Money value={data.fixed} />} sub={`${data.bills.filter((b) => b.status === 'paid').length} of ${data.bills.length} due this week paid`} />
+        <Stat label="Money in" value={<Money value={data.income} />} sub={data.saved ? <>Saved and invested {money(data.saved)}</> : 'Nothing moved to savings'} tone={data.income > 0 ? 'good' : undefined} />
+      </div>
+
+      <Card title="Day by day" action={<span className="muted small">{data.categories.some((c) => c.fixed && c.total > 0) ? 'Bills and rent are hidden: click the key to show them' : 'Click a day to see its transactions'}</span>}>
+        {data.count === 0 ? <p className="muted">Nothing to show for this week.</p> : (
+          <StackedBars labels={data.days.map((d) => `${d.label} ${Number(d.date.slice(8))}`)} titles={data.days.map((d) => `${weekday(d.date)} ${dayMonth(d.date)}`)}
+            series={data.series} hidden={hidden} onToggle={toggle} onBarClick={openDay} barHint="Click to see this day's transactions"
+            selected={data.current ? data.days.findIndex((d) => d.today) : null}
+            reference={typicalDay ? { value: typicalDay, label: 'typical day-to-day' } : undefined} height={220} />
+        )}
+      </Card>
+
+      <div className="grid-2-cards">
+        <Card title="By category" pad={false} action={<span className="muted small">vs {data.current ? 'same days last week' : 'week before'}</span>}>
+          {data.categories.length === 0 ? <p className="muted pad">No spending.</p> : (
+            <table className="report-table week-cats">
+              <tbody>
+                {data.categories.map((c) => (
+                  <tr key={String(c.categoryId)} className="clickable" onClick={() => navigate(`/transactions${qs({ from: range.from, to: data.upTo, month: 'all', categoryId: c.categoryId ?? undefined, uncategorised: c.categoryId == null ? 1 : undefined })}`)}>
+                    <td>
+                      <span className="row gap nowrap"><span className="dot" style={{ background: c.colour }} />{c.name}{c.fixed && <span className="tag">Fixed</span>}</span>
+                      <span className="week-bar"><span style={{ width: `${(c.total / maxCat) * 100}%`, background: c.colour }} /><span className="prev" style={{ left: `${(c.previous / maxCat) * 100}%` }} title={`${money(c.previous)} ${data.current ? 'same days last week' : 'week before'}`} /></span>
+                    </td>
+                    <td className="num"><strong>{money(c.total)}</strong><div className="muted small">{c.count} {c.count === 1 ? 'spend' : 'spends'}</div></td>
+                    <td className={`num small ${c.change > 100 ? 'tone-bad' : c.change < -100 ? 'tone-good' : 'muted'}`}>{Math.abs(c.change) < 100 ? 'same' : `${c.change > 0 ? '+' : '−'}${money(Math.abs(c.change))}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="muted small pad">The tick on each bar marks {data.current ? 'the same days last week' : 'the week before'}.</p>
+        </Card>
+
+        <div className="stack">
+          {data.budgets.length > 0 && (
+            <Card title="Budgets" action={<button className="link-btn small" onClick={() => navigate('/budgets')}>Budgets</button>}>
+              <ul className="week-list">
+                {data.budgets.map((b) => (
+                  <li key={b.id}>
+                    <span className="week-icon">{b.icon ?? '•'}</span>
+                    <span className="grow"><strong>{b.name}</strong><div className="muted small">{money(b.thisWeek)} this week · {b.remaining >= 0 ? `${money(b.remaining)} left` : `${money(-b.remaining)} over`} for {b.periodLabel}</div>
+                      <span className="week-bar"><span style={{ width: `${Math.min(100, (b.spent / Math.max(1, b.available)) * 100)}%`, background: b.status === 'over' ? 'var(--bad)' : b.status === 'warn' ? 'var(--warn)' : b.colour }} /></span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          <Card title="Where you spent it">
+            {data.places.length === 0 ? <p className="muted">No spending.</p> : (
+              <ul className="week-list">
+                {data.places.map((p) => (
+                  <li key={p.merchant} className="clickable" onClick={() => navigate(`/transactions${qs({ from: range.from, to: data.upTo, month: 'all', merchant: p.merchant })}`)}>
+                    <span className="dot" style={{ background: p.colour }} />
+                    <span className="grow"><span className="ellipsis">{p.label}</span><span className="week-bar thin"><span style={{ width: `${(p.total / maxPlace) * 100}%`, background: p.colour }} /></span></span>
+                    <span className="num"><strong>{money(p.total)}</strong>{p.count > 1 && <div className="muted small">{p.count} times</div>}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      <div className="grid-2-cards">
+        <Card title="Biggest spends">
+          {data.biggest.length === 0 ? <p className="muted">No spending.</p> : (
+            <ul className="week-list">
+              {data.biggest.map((b) => (
+                <li key={b.id} className="clickable" onClick={() => navigate(`/transactions${qs({ from: b.date, to: b.date, month: 'all', merchant: b.merchant })}`)}>
+                  <span className="dot" style={{ background: b.colour }} />
+                  <span className="grow"><strong>{b.label}</strong><div className="muted small">{weekday(b.date).slice(0, 3)} {dayMonth(b.date)} · {b.category}</div></span>
+                  <strong className="num">{money(b.amount)}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card title={data.current ? 'Bills this week and next' : 'Bills this week'} action={<button className="link-btn small" onClick={() => navigate('/bills')}>Bills</button>}>
+          {data.bills.length === 0 && data.upcoming.length === 0 ? <p className="muted">No bills due.</p> : (
+            <ul className="week-list">
+              {data.bills.map((b) => (
+                <li key={`${b.recurringId}-${b.date}`}>
+                  <span className="week-date">{weekday(b.date).slice(0, 3)}<b>{Number(b.date.slice(8))}</b></span>
+                  <span className="grow">{b.name}</span>
+                  <Badge tone={b.status === 'paid' ? 'good' : b.status === 'overdue' ? 'bad' : 'neutral'}>{b.status === 'paid' ? 'Paid' : b.status === 'overdue' ? 'Overdue' : b.status === 'skipped' ? 'Skipped' : 'Due'}</Badge>
+                  <strong className="num">{money(b.amount)}</strong>
+                </li>
+              ))}
+              {data.upcoming.length > 0 && <li className="week-sep muted small">Next week</li>}
+              {data.upcoming.map((b) => (
+                <li key={`n${b.recurringId}-${b.date}`} className="muted">
+                  <span className="week-date">{weekday(b.date).slice(0, 3)}<b>{Number(b.date.slice(8))}</b></span>
+                  <span className="grow">{b.name}</span>
+                  <span className="num">{money(b.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </>
   );
 }
 

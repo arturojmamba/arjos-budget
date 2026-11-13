@@ -34,7 +34,7 @@ import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
-import { spendingExplorer, cutBack, habits, budgetRecord, cashFlow, compareDrivers } from './insights.ts';
+import { spendingExplorer, cutBack, habits, budgetRecord, cashFlow, compareDrivers, weekly } from './insights.ts';
 
 type Handler = (ctx: { db: DB; params: Record<string, string>; query: URLSearchParams; body: any }) => unknown;
 
@@ -305,6 +305,7 @@ route('GET', '/api/reports/cutback', ({ db }) => cutBack(db));
 route('GET', '/api/reports/habits', ({ db, query }) => habits(db, rng(query)));
 route('GET', '/api/reports/budgets', ({ db }) => budgetRecord(db));
 route('GET', '/api/reports/cashflow', ({ db, query }) => cashFlow(db, Number(query.get('months') ?? 12)));
+route('GET', '/api/reports/week', ({ db, query }) => weekly(db, query.get('week')));
 route('GET', '/api/reports/compare2', ({ db, query }) => compareDrivers(db, rng(query, 'aFrom', 'aTo'), rng(query, 'bFrom', 'bTo')));
 route('GET', '/api/reports/compare', ({ db, query }) => compare(db, rng(query, 'aFrom', 'aTo'), rng(query, 'bFrom', 'bTo')));
 route('GET', '/api/reports/networth', ({ db, query }) => netWorthHistory(db, Number(query.get('months') ?? 24)));

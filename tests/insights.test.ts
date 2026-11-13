@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testDb } from './fixtures.ts';
 import { createTransaction, simpleToPostings } from '../server/ledger.ts';
-import { spendingExplorer, cutBack, habits, payday, compareDrivers, previousRange, placeLabel } from '../server/insights.ts';
+import { spendingExplorer, cutBack, habits, payday, compareDrivers, previousRange, placeLabel, weekly, weekStart } from '../server/insights.ts';
 
 function setup() {
   const db = testDb();
@@ -96,4 +96,43 @@ test('compare shows the places behind the difference', () => {
   assert.equal(r.places[0].label, 'Spice Room');
   assert.equal(r.places[0].diff, 6000);
   assert.equal(r.categories[0].diff, 6000);
+});
+
+test('weekly: Monday to Sunday, the same days last week, and a typical week', () => {
+  const { db, spend } = setup();
+  assert.equal(weekStart('2026-11-13'), '2026-11-09', 'Friday → Monday');
+  assert.equal(weekStart('2026-11-15'), '2026-11-09', 'Sunday belongs to the week before it');
+  assert.equal(weekStart('2026-11-09'), '2026-11-09');
+  // 8 weeks of history: £10 coffee every Monday, £60 groceries every Saturday
+  for (let w = 0; w < 9; w++) {
+    const mon = new Date(Date.UTC(2026, 8, 14 + 7 * w)).toISOString().slice(0, 10);
+    const sat = new Date(Date.UTC(2026, 8, 19 + 7 * w)).toISOString().slice(0, 10);
+    spend(mon, 'CAFE LUMEN', 10, 'Eating Out');
+    if (sat < '2026-11-13') spend(sat, 'BASKETCO STORES', 60, 'Groceries');
+  }
+  spend('2026-11-10', 'OAKLET LETTINGS', 900, 'Rent / Housing');
+  spend('2026-11-12', 'GRILLHOUSE', 25, 'Eating Out');
+
+  const w = weekly(db, null, '2026-11-13'); // a Friday
+  assert.equal(w.from, '2026-11-09');
+  assert.equal(w.to, '2026-11-15');
+  assert.equal(w.current, true);
+  assert.equal(w.elapsed, 5);
+  assert.equal(w.spent, 93500);
+  assert.equal(w.fixed, 90000, 'rent is a fixed cost');
+  assert.equal(w.dayToDay, 3500);
+  assert.equal(w.last.spent, 1000, 'last week up to Friday: only Monday coffee, not Saturday groceries');
+  assert.equal(w.last.fullWeek, 7000);
+  assert.deepEqual(w.typical, { spent: 7000, dayToDay: 7000, weeks: 8 });
+  assert.deepEqual(w.days.map((d) => d.label), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  assert.deepEqual(w.days.map((d) => d.future), [false, false, false, false, false, true, true]);
+  assert.equal(w.nextWeek, null);
+
+  const past = weekly(db, '2026-11-04', '2026-11-13'); // any day picks its week
+  assert.equal(past.from, '2026-11-02');
+  assert.equal(past.isLastWeek, true);
+  assert.equal(past.nextWeek, '2026-11-09');
+  assert.equal(past.spent, 7000);
+  assert.equal(past.last.sameDays, false);
+  assert.throws(() => weekly(db, '2026-11-16', '2026-11-13'), /hasn't started/);
 });

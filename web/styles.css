@@ -1351,3 +1351,26 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .btn-danger-outline { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
 .btn-danger-outline:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 10%, transparent); }
 .t212-account { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); align-items: center; }
+
+/* Reports: this week */
+.week-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; }
+.week-title { display: flex; flex-direction: column; min-width: 0; }
+.week-title h2 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
+.week-lede { margin: 0 0 14px; color: var(--text-2); font-size: 14.5px; line-height: 1.5; max-width: 860px; }
+.week-lede strong { color: var(--text); }
+.week-bar { position: relative; display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--track); }
+.week-bar > span:first-child { display: block; height: 100%; border-radius: 3px; }
+.week-bar.thin { height: 4px; margin-top: 5px; }
+.week-bar .prev { position: absolute; top: -3px; width: 2px; height: 12px; border-radius: 1px; background: var(--text-3); transform: translateX(-1px); }
+.week-cats td { vertical-align: middle; }
+.week-cats td:first-child { width: 60%; }
+.week-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.week-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; min-width: 0; }
+.week-list li.clickable { cursor: pointer; border-radius: 8px; margin: -4px -6px; padding: 4px 6px; }
+.week-list li.clickable:hover { background: var(--surface-2); }
+.week-list .grow { flex: 1; min-width: 0; }
+.week-list .num { text-align: right; white-space: nowrap; }
+.week-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--surface-2); flex-shrink: 0; }
+.week-date { width: 34px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; font-size: 10.5px; text-transform: uppercase; color: var(--text-3); line-height: 1.1; }
+.week-date b { font-size: 15px; color: var(--text); }
+.week-sep { padding-top: 6px; border-top: 1px solid var(--border); }
