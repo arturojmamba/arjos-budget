@@ -13,7 +13,9 @@
     "start": "npm run build && node --disable-warning=ExperimentalWarning --import tsx server/index.ts",
     "test": "node --disable-warning=ExperimentalWarning --import tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "backup": "node --disable-warning=ExperimentalWarning --import tsx scripts/backup.ts"
+    "backup": "node --disable-warning=ExperimentalWarning --import tsx scripts/backup.ts",
+    "demo": "node --disable-warning=ExperimentalWarning --import tsx scripts/demo.ts data/demo.db",
+    "start:demo": "npm run build && FINANCE_DB=data/demo.db FINANCE_BACKUPS=data/demo-backups T212_API_KEY=demo T212_API_SECRET=demo T212_SYNC=off PORT=4546 node --disable-warning=ExperimentalWarning --import tsx server/index.ts"
   },
   "dependencies": {
     "react": "^19.2.0",

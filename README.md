@@ -49,6 +49,17 @@ npm run typecheck
 npm run backup       # one-off backup
 ```
 
+## Demo data
+
+To try the app or take screenshots without your own data, build a demo database full of made-up data: a fictional person, employer, banks, shops and funds, with a year of transactions, bills, budgets, goals, a loan and a Trading 212 ISA.
+
+```bash
+npm run demo         # writes data/demo.db (your own data/finance.db is not touched)
+npm run start:demo   # serves it on http://localhost:4546, with Trading 212 shown as connected but not syncing
+```
+
+Set `T212_SYNC=off` to pause automatic Trading 212 syncing in general.
+
 ## Trading 212 (optional)
 
 Copy `.env.example` to `.env` and add an API key from Trading 212 (Settings → API):

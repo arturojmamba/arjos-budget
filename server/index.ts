@@ -53,7 +53,7 @@ setInterval(() => { try { dailyBackup(); } catch {} }, 6 * 60 * 60 * 1000).unref
 try { autoMatch(db); } catch (e) { console.warn('Bill matching failed:', e); }
 async function syncAll() {
   const config = trading212Config();
-  if (!config) return;
+  if (!config || process.env.T212_SYNC === 'off') return; // T212_SYNC=off pauses automatic syncing (e.g. for the demo)
   // One API key is one Trading 212 account.
   for (const accountId of syncedAccounts(db).slice(0, 1)) {
     try {
