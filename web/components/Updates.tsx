@@ -28,7 +28,7 @@ function useUpdates(poll = 0) {
 async function restartToUpdate(toast: (m: string, k?: 'ok' | 'error') => void) {
   try {
     await api.post('/api/desktop/update/install', {});
-    toast('Updating… Ledger will reopen in a moment.');
+    toast('Updating… Coil will reopen in a moment.');
   } catch (e: any) { toast(e.message, 'error'); }
 }
 
@@ -43,7 +43,7 @@ function Notes({ text }: { text: string }) {
   );
 }
 
-/** Desktop app only: "Ledger 1.2.1 is ready · What's new · Restart to update", shown after you unlock. */
+/** Desktop app only: "Coil 1.4.0 is ready · What's new · Restart to update", shown after you unlock. */
 export function UpdateBanner() {
   const { meta, toast } = useApp();
   const { info } = useUpdates(meta.desktop ? 5 * 60_000 : 0);
@@ -56,7 +56,7 @@ export function UpdateBanner() {
     <>
       <div className="update-banner" role="status">
         <Icon name="download" size={16} />
-        <span className="grow"><strong>Ledger {a.version} is ready.</strong> <button className="link-btn" onClick={() => setNotes(true)}>What's new</button></span>
+        <span className="grow"><strong>Coil {a.version} is ready.</strong> <button className="link-btn" onClick={() => setNotes(true)}>What's new</button></span>
         <button className="btn btn-sm btn-primary" onClick={() => restartToUpdate(toast)}>Restart to update</button>
         <button className="btn btn-icon btn-sm" aria-label="Later" title="Later" onClick={() => setHidden(a.version)}><Icon name="x" size={14} /></button>
       </div>
@@ -94,7 +94,7 @@ export function AboutCard() {
   if (!meta.desktop) {
     return (
       <Card title="About">
-        <p className="muted">You're running Ledger from its source folder (<code>npm start</code>). To update, pull the latest code and restart: <code>git pull && npm start</code>. The desktop app updates itself.</p>
+        <p className="muted">You're running Coil from its source folder (<code>npm start</code>). To update, pull the latest code and restart: <code>git pull && npm start</code>. The desktop app updates itself.</p>
       </Card>
     );
   }
@@ -116,16 +116,16 @@ export function AboutCard() {
             {s?.status === 'none' && <p><Icon name="check" size={14} /> You're up to date.{info.checkedAt && <span className="muted small"> Checked {new Date(info.checkedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.</span>}</p>}
             {s?.status === 'idle' && <p className="muted">Not checked yet.</p>}
             {s?.status === 'downloading' && (
-              <div><p>Downloading Ledger {s.available.version}… {pct}%</p><span className="week-bar"><span style={{ width: `${pct}%`, background: 'var(--accent)' }} /></span></div>
+              <div><p>Downloading Coil {s.available.version}… {pct}%</p><span className="week-bar"><span style={{ width: `${pct}%`, background: 'var(--accent)' }} /></span></div>
             )}
             {s?.status === 'ready' && (
               <div className="row gap wrap">
-                <span className="grow"><strong>Ledger {s.available.version} is ready.</strong> <button className="link-btn" onClick={() => setNotes(true)}>What's new</button></span>
+                <span className="grow"><strong>Coil {s.available.version} is ready.</strong> <button className="link-btn" onClick={() => setNotes(true)}>What's new</button></span>
                 <button className="btn btn-primary" onClick={() => restartToUpdate(toast)}>Restart to update</button>
               </div>
             )}
             {s?.status === 'manual' && (
-              <div className="hint-box"><Icon name="info" size={16} /><span>Ledger {s.available.version} is downloaded but can't be installed automatically: {s.reason} <button className="link-btn" onClick={() => api.post('/api/desktop/update/open', {})}>Open the installer</button></span></div>
+              <div className="hint-box"><Icon name="info" size={16} /><span>Coil {s.available.version} is downloaded but can't be installed automatically: {s.reason} <button className="link-btn" onClick={() => api.post('/api/desktop/update/open', {})}>Open the installer</button></span></div>
             )}
             {s?.status === 'error' && <p className="tone-bad small">{s.message}</p>}
           </div>

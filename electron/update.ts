@@ -92,7 +92,7 @@ export class Updater {
       try { await verifyDownload(file, a.asset); this.file = file; this.state = { status: 'ready', available: strip(a) }; return; } catch { fs.rmSync(file, { force: true }); }
     }
     this.state = { status: 'downloading', available: strip(a), received: 0, total: a.asset.size };
-    const res = await fetch(a.asset.url, { headers: { 'User-Agent': 'Ledger-desktop-updater' } });
+    const res = await fetch(a.asset.url, { headers: { 'User-Agent': 'Coil-desktop-updater' } });
     if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`);
     const part = `${file}.part`;
     let received = 0;

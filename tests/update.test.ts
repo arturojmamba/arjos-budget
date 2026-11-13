@@ -46,6 +46,17 @@ test('reads the latest GitHub release', async () => {
   await assert.rejects(latestRelease('o/r', '1.2.0', 'darwin', 'arm64', fakeFetch(403, {})), /GitHub answered 403/);
 });
 
+test('release files named Coil-… are preferred, Ledger-… still found', async () => {
+  assert.equal(assetName('1.5.0', 'darwin', 'arm64', 'Coil'), 'Coil-1.5.0-mac-arm64.dmg');
+  const both = release('v1.5.0', { assets: [
+    { name: 'Ledger-1.5.0-mac-arm64.dmg', browser_download_url: 'https://example/old.dmg', size: 10 },
+    { name: 'Coil-1.5.0-mac-arm64.dmg', browser_download_url: 'https://example/new.dmg', size: 10 },
+  ] });
+  assert.equal((await latestRelease('o/r', '1.4.0', 'darwin', 'arm64', fakeFetch(200, both)))?.asset.url, 'https://example/new.dmg');
+  const coilOnly = release('v1.5.0', { assets: [{ name: 'Coil-Setup-1.5.0.exe', browser_download_url: 'https://example/c.exe', size: 10 }] });
+  assert.equal((await latestRelease('o/r', '1.4.0', 'win32', 'x64', fakeFetch(200, coilOnly)))?.asset.url, 'https://example/c.exe');
+});
+
 test('downloads are checked before installing', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upd-'));
   const file = path.join(dir, 'x.dmg');

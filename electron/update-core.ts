@@ -22,12 +22,14 @@ export function isNewer(candidate: string, current: string): boolean {
   return false;
 }
 
-/** The installer for this computer, named as the build names them. */
-export function assetName(version: string, platform: string, arch: string): string | null {
-  if (platform === 'darwin') return `Ledger-${version}-mac-${arch === 'arm64' ? 'arm64' : 'x64'}.dmg`;
-  if (platform === 'win32') return `Ledger-Setup-${version}.exe`;
+/** The installer for this computer, named as the build names them (`prefix` Ledger before the app was renamed Coil). */
+export function assetName(version: string, platform: string, arch: string, prefix = 'Ledger'): string | null {
+  if (platform === 'darwin') return `${prefix}-${version}-mac-${arch === 'arm64' ? 'arm64' : 'x64'}.dmg`;
+  if (platform === 'win32') return `${prefix}-Setup-${version}.exe`;
   return null;
 }
+/** Release files may be named Coil-… or (as the earlier versions expect) Ledger-…; Coil is preferred. */
+export const ASSET_PREFIXES = ['Coil', 'Ledger'];
 
 /**
  * Looks at the latest GitHub release and returns it if it's newer than this version and has a file
@@ -37,7 +39,7 @@ export async function latestRelease(repo: string, current: string, platform: str
   // No sign-in needed for a public repo. A token is only used by the build's update test
   // (GitHub's shared build machines can hit the anonymous rate limit).
   const res = await fetchImpl(`https://api.github.com/repos/${repo}/releases/latest`, {
-    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Ledger-desktop-updater', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Coil-desktop-updater', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
   if (res.status === 404) return null; // no releases yet
   if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
@@ -45,8 +47,12 @@ export async function latestRelease(repo: string, current: string, platform: str
   if (r.draft || r.prerelease) return null;
   const version = String(r.tag_name ?? '').replace(/^v/, '');
   if (!parseVersion(version) || !isNewer(version, current)) return null;
-  const want = assetName(version, platform, arch);
-  const a = (r.assets ?? []).find((x: any) => x.name === want);
+  let a: any = null;
+  for (const prefix of ASSET_PREFIXES) {
+    const want = assetName(version, platform, arch, prefix);
+    a = (r.assets ?? []).find((x: any) => x.name === want) ?? null;
+    if (a) break;
+  }
   if (!a) return null;
   const digest = typeof a.digest === 'string' && a.digest.startsWith('sha256:') ? a.digest.slice(7).toLowerCase() : null;
   return {
@@ -74,23 +80,23 @@ export async function verifyDownload(file: string, asset: ReleaseAsset): Promise
 /** Where a Mac app can be replaced in place; null with a reason when it can't. */
 export function macAppPath(execPath: string, writable: (dir: string) => boolean): { app: string } | { reason: string } {
   const i = execPath.indexOf('.app/Contents/MacOS/');
-  if (i < 0) return { reason: "Ledger isn't running as an installed app" };
+  if (i < 0) return { reason: "Coil isn't running as an installed app" };
   const app = execPath.slice(0, i + 4);
-  if (app.startsWith('/Volumes/')) return { reason: 'Ledger is running from the disk image. Drag it to Applications first.' };
-  if (app.includes('/AppTranslocation/')) return { reason: 'macOS is running Ledger from a temporary location. Move it to Applications (or open it once from there) and try again.' };
+  if (app.startsWith('/Volumes/')) return { reason: 'Coil is running from the disk image. Drag it to Applications first.' };
+  if (app.includes('/AppTranslocation/')) return { reason: 'macOS is running Coil from a temporary location. Move it to Applications (or open it once from there) and try again.' };
   const dir = app.slice(0, app.lastIndexOf('/'));
-  if (!writable(dir)) return { reason: `Ledger can't write to ${dir}.` };
+  if (!writable(dir)) return { reason: `Coil can't write to ${dir}.` };
   return { app };
 }
 
 /**
- * Runs after Ledger quits: mounts the new disk image, copies the new app next to the old one,
+ * Runs after the app quits: mounts the new disk image, copies the new app next to the old one,
  * swaps them, and opens it. If anything fails, the old app is put back and the disk image is
  * opened so the update can be installed by hand. Nothing is ever left half-replaced.
  */
 export function macInstallScript(): string {
   return `#!/bin/bash
-# Ledger updater: $1 = PID to wait for, $2 = new .dmg, $3 = installed .app, $4 = log file, $5 = "norelaunch" in tests
+# Coil updater: $1 = PID to wait for, $2 = new .dmg, $3 = installed .app, $4 = log file, $5 = "norelaunch" in tests
 PID="$1"; DMG="$2"; APP="$3"; LOG="$4"; MODE="$5"
 exec >>"$LOG" 2>&1
 echo "$(date) updating $APP from $DMG"

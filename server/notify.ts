@@ -203,7 +203,7 @@ export function dueNotifications(db: DB, today = todayIso(), s = notifySettings(
 export const noticeKeys = (n: Notice) => n.key.split('|');
 
 export function updateNotice(version: string): Notice {
-  return { key: `update:${version}`, kind: 'updates', title: `Ledger ${version} is ready`, body: 'Restart to update. Your data stays as it is.', route: '/settings?tab=about' };
+  return { key: `update:${version}`, kind: 'updates', title: `Coil ${version} is ready`, body: 'Restart to update. Your data stays as it is.', route: '/settings?tab=about' };
 }
 
 export function wasSent(db: DB, key: string): boolean {

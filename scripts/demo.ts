@@ -45,7 +45,7 @@ const on = (ym: string, day: number) => `${ym}-${String(day).padStart(2, '0')}`;
 // ---------------------------------------------------------------------------------------------
 // Person, accounts, categories
 
-saveProfile(db, { name: 'Alex', appName: 'Ledger' });
+saveProfile(db, { name: 'Alex', appName: '' });
 db.exec("DELETE FROM accounts WHERE institution IS NULL OR institution != 'Trading 212'");
 const acct = (name: string, type: string, institution: string, colour: string, balance: number, extra: Record<string, unknown> = {}) =>
   createAccount(db, { name, type, institution, colour, balance, balanceDate: START, ...extra } as any);

@@ -33,10 +33,10 @@ jobs:
         include:
           - os: macos-latest
             target: --mac
-            smoke: release/mac-arm64/Ledger.app/Contents/MacOS/Ledger
+            smoke: release/mac-arm64/Coil.app/Contents/MacOS/Coil
           - os: windows-latest
             target: --win
-            smoke: release/win-unpacked/Ledger.exe
+            smoke: release/win-unpacked/Coil.exe
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -94,7 +94,7 @@ jobs:
             prev="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$RELEASE" | head -1)"
             git log --no-merges --pretty='- %s' ${prev:+$prev..}HEAD | grep -v '^- Desktop workflow' > notes.md || true
           fi
-          printf '\n\nMac (Apple Silicon): Ledger-%s-mac-arm64.dmg · Mac (Intel): Ledger-%s-mac-x64.dmg · Windows: Ledger-Setup-%s.exe\nAlready have Ledger 1.2 or later? It updates itself: look for "Restart to update".\n' "${RELEASE#v}" "${RELEASE#v}" "${RELEASE#v}" >> notes.md
+          printf '\n\nMac (Apple Silicon): Ledger-%s-mac-arm64.dmg · Mac (Intel): Ledger-%s-mac-x64.dmg · Windows: Ledger-Setup-%s.exe\nAlready have Coil (or Ledger 1.2 or later)? It updates itself: look for "Restart to update".\n' "${RELEASE#v}" "${RELEASE#v}" "${RELEASE#v}" >> notes.md
           cat notes.md
 
       - name: Attach to the release
@@ -103,7 +103,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE }}
           target_commitish: ${{ github.sha }}
-          name: Ledger ${{ env.RELEASE }}
+          name: Coil ${{ env.RELEASE }}
           body_path: notes.md
           files: |
             release/*.dmg

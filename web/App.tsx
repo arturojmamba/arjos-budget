@@ -5,6 +5,7 @@ import { AppContext } from './components/ui.tsx';
 import { Icon } from './components/Icon.tsx';
 import { TransactionForm } from './components/TransactionForm.tsx';
 import { useRoute, navigate, setParams } from './router.ts';
+import { BrandMark } from './components/BrandMark.tsx';
 import { addMonths, monthLabel, setAmountsHidden, setShowPence } from './format.ts';
 import { Budgets } from './pages/Budgets.tsx';
 import { Debts } from './pages/Debts.tsx';
@@ -139,7 +140,7 @@ export function App() {
     <AppContext.Provider value={ctx}>
       <div className="shell">
         <aside className="sidebar">
-          <div className="brand"><span className="brand-mark">£</span><span>{meta.profile.appName || 'Ledger'}</span></div>
+          <div className="brand"><BrandMark /><span>{meta.profile.appName || 'Coil'}</span></div>
           <nav>
             {NAV_GROUPS.map((g, gi) => (
               <div key={gi} className="nav-group" role="group" aria-label={g.label ?? 'Main'}>
@@ -240,14 +241,38 @@ export function applyAppearance(a: Appearance, p?: Profile) {
   const r = document.documentElement;
   if (a.theme === 'system') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', a.theme);
   r.style.setProperty('--accent', a.accent);
+  // Text on the accent, and the accent as text, chosen so they stay readable whatever accent you pick.
+  r.style.setProperty('--accent-ink', contrast(a.accent, '#0f1a2e') >= contrast(a.accent, '#ffffff') ? '#0f1a2e' : '#ffffff');
+  r.style.setProperty('--accent-text-light', readableOn(a.accent, '#fffdf8', '#000000'));
+  r.style.setProperty('--accent-text-dark', readableOn(a.accent, '#111c30', '#ffffff'));
   r.classList.toggle('density-compact', a.density === 'compact');
   r.classList.toggle('text-small', a.textSize === 'small');
   r.classList.toggle('text-large', a.textSize === 'large');
   r.classList.toggle('reduce-motion', a.reduceMotion);
   setShowPence(a.showPence);
-  const title = `${p?.appName || 'Ledger'} · Personal finance`;
+  const title = `${p?.appName || 'Coil'} · Personal finance`;
   document.title = title;
   try { localStorage.setItem('finance.appearance', JSON.stringify(a)); localStorage.setItem('finance.title', title); } catch { /* ignore */ }
+}
+
+const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const hex = (c: number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+function luminance(h: string) {
+  const [r, g, b] = rgb(h).map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+export function contrast(a: string, b: string) {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+}
+/** The colour, mixed towards `toward` just enough to be readable as text on `bg` (4.5:1). */
+function readableOn(colour: string, bg: string, toward: string) {
+  const a = rgb(colour), t = rgb(toward);
+  for (let k = 0; k <= 1; k += 0.05) {
+    const c = hex(a.map((v, i) => v + (t[i] - v) * k));
+    if (contrast(c, bg) >= 4.6) return c;
+  }
+  return toward;
 }
 
 function greeting(name: string): string {

@@ -24,7 +24,7 @@ import { Updater } from './update.ts';
 import { runNotifications, notifySettings, updateNotice, wasSent, markSent, type Notice } from '../server/notify.ts';
 import type { DesktopHost } from '../server/app.ts';
 
-const PRODUCT = 'Ledger';
+const PRODUCT = 'Coil';
 const SMOKE = process.env.LEDGER_SMOKE === '1';
 /** CI: check for an update, install it without reopening, write the result, quit. */
 const UPDATE_TEST = process.env.LEDGER_UPDATE_TEST === '1';
@@ -39,6 +39,9 @@ function releaseRepo(): string | null {
   } catch { return null; }
 }
 app.setName(PRODUCT);
+// The app was called Ledger before it was Coil. Its data folder keeps that name, so nothing has to move.
+app.setPath('userData', path.join(app.getPath('appData'), 'Ledger'));
+app.setAboutPanelOptions({ applicationName: PRODUCT, copyright: 'Personal use' });
 // Windows ties notifications to the app's ID (the installer's shortcut carries the same one).
 if (process.platform === 'win32') app.setAppUserModelId('app.ledger.desktop');
 const MAC = process.platform === 'darwin';
@@ -79,6 +82,46 @@ function saveKey(key: string, secret: string) {
 function clearKey() {
   fs.rmSync(keyFile, { force: true });
   delete process.env.T212_API_KEY; delete process.env.T212_API_SECRET;
+}
+
+// ---------------------------------------------------------------------------
+// After the rename from Ledger
+
+/**
+ * Mac: an update from a Ledger version swaps the new app in at /Applications/Ledger.app. Rename it to
+ * Coil.app and reopen from there, once. Returns true when it's relaunching.
+ */
+function renameMacBundle(): boolean {
+  if (!MAC || !app.isPackaged || SMOKE || UPDATE_TEST) return false;
+  const i = process.execPath.indexOf('.app/Contents/MacOS/');
+  if (i < 0) return false;
+  const bundle = process.execPath.slice(0, i + 4);
+  if (path.basename(bundle) !== 'Ledger.app' || bundle.startsWith('/Volumes/') || bundle.includes('/AppTranslocation/')) return false;
+  const target = path.join(path.dirname(bundle), 'Coil.app');
+  try {
+    if (fs.existsSync(target)) return false;
+    fs.accessSync(path.dirname(bundle), fs.constants.W_OK);
+    fs.renameSync(bundle, target);
+  } catch { return false; }
+  app.relaunch({ execPath: path.join(target, 'Contents', 'MacOS', path.basename(process.execPath)) });
+  app.exit(0);
+  return true;
+}
+
+/** Windows: the program file is now Coil.exe; move "Open at login" over from Ledger.exe if it was on. */
+function moveLoginItem() {
+  if (process.platform !== 'win32' || !app.isPackaged) return;
+  const here = path.dirname(process.execPath);
+  for (const old of [path.join(here, 'Ledger.exe'), path.join(path.dirname(here), 'Ledger', 'Ledger.exe')]) {
+    if (old.toLowerCase() === process.execPath.toLowerCase()) continue;
+    try {
+      if (app.getLoginItemSettings({ path: old, args: ['--hidden'] }).openAtLogin) {
+        app.setLoginItemSettings({ openAtLogin: false, path: old, args: ['--hidden'] });
+        app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] });
+        return;
+      }
+    } catch { /* leave it: it can be switched on again in Settings */ }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +169,7 @@ function createWindow(url: string) {
   win = new BrowserWindow({
     width: s.width, height: s.height, x: s.x, y: s.y, minWidth: 380, minHeight: 560,
     title: PRODUCT, show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f3f4f6',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0b1322' : '#f5f1e8',
     titleBarStyle: process.platform === 'darwin' ? 'default' : undefined,
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
@@ -176,7 +219,7 @@ async function showTray() {
       { label: `Quit ${PRODUCT}`, click: () => { quitting = true; app.quit(); } },
     ]));
     tray.on('click', () => openRoute('/'));
-  } catch { /* no tray: the window just stays hidden; opening Ledger again shows it */ }
+  } catch { /* no tray: the window just stays hidden; opening Coil again shows it */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +308,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } });
 
   app.whenReady().then(async () => {
+    if (renameMacBundle()) return;
+    moveLoginItem();
     if (!(await firstRun())) { app.quit(); return; }
     loadKey();
     const repo = releaseRepo();

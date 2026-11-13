@@ -47,43 +47,49 @@ jobs:
         run: |
           gh release download "${{ steps.prev.outputs.tag }}" -R "$GITHUB_REPOSITORY" -p '*-mac-arm64.dmg' -O old.dmg
           hdiutil attach -nobrowse -mountpoint /tmp/old old.dmg
-          cp -R /tmp/old/Ledger.app /Applications/
+          src="$(ls -d /tmp/old/*.app | head -1)"; cp -R "$src" /Applications/
           hdiutil detach /tmp/old
-          defaults read /Applications/Ledger.app/Contents/Info CFBundleShortVersionString
+          # Ledger.app before the rename, Coil.app after; the updater replaces it where it is.
+          echo "APP=/Applications/$(basename "$src")" >> "$GITHUB_ENV"
+          defaults read "/Applications/$(basename "$src")/Contents/Info" CFBundleShortVersionString
 
       - name: Let it update itself (Mac)
         if: steps.prev.outputs.skip == 'false' && runner.os == 'macOS'
         run: |
-          env $TEST_ENV LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_SMOKE_FILE="$PWD/u.txt" /Applications/Ledger.app/Contents/MacOS/Ledger || true
+          bin() { echo "$APP/Contents/MacOS/$(defaults read "$APP/Contents/Info" CFBundleExecutable)"; }
+          env $TEST_ENV LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_SMOKE_FILE="$PWD/u.txt" "$(bin)" || true
           cat u.txt; grep -q "UPDATE TEST OK" u.txt
           want="${RELEASE#v}"
           for i in $(seq 1 90); do
-            v="$(defaults read /Applications/Ledger.app/Contents/Info CFBundleShortVersionString 2>/dev/null || true)"
+            v="$(defaults read "$APP/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
             [ "$v" = "$want" ] && break; sleep 2
           done
           echo "installed: $v"; cat ~/Library/Application\ Support/Ledger/update.log || true
           [ "$v" = "$want" ]
-          LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" /Applications/Ledger.app/Contents/MacOS/Ledger || true
+          LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" "$(bin)" || true
           cat s.txt; grep -q "SMOKE OK $want darwin" s.txt
 
       - name: Install the previous version (Windows)
         if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
         shell: pwsh
         run: |
-          gh release download "${{ steps.prev.outputs.tag }}" -R $env:GITHUB_REPOSITORY -p 'Ledger-Setup-*.exe' -O old.exe
+          gh release download "${{ steps.prev.outputs.tag }}" -R $env:GITHUB_REPOSITORY -p '*-Setup-*.exe' -O old.exe
           Start-Process -FilePath .\old.exe -ArgumentList '/S' -Wait
-          Test-Path "$env:LOCALAPPDATA\Programs\Ledger\Ledger.exe"
+          Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Include Ledger.exe,Coil.exe -Depth 1 | Select-Object FullName
 
       - name: Let it update itself (Windows)
         if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
         run: |
-          exe="$LOCALAPPDATA/Programs/Ledger/Ledger.exe"
+          # Ledger.exe before the rename, Coil.exe after (the folder may be either name too).
+          find_exe() { ls "$LOCALAPPDATA"/Programs/*/Coil.exe "$LOCALAPPDATA"/Programs/*/Ledger.exe 2>/dev/null | head -1; }
+          exe="$(find_exe)"; echo "installed: $exe"
           env $TEST_ENV LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_SMOKE_FILE="$PWD/u.txt" timeout 300 "$exe" || true
           cat u.txt; grep -q "UPDATE TEST OK" u.txt
           want="${RELEASE#v}"
           for i in $(seq 1 60); do
             sleep 3
-            tasklist | grep -qi "Ledger-Setup" && continue
+            tasklist | grep -qiE "(Ledger|Coil)-Setup" && continue
+            exe="$(find_exe)"; [ -n "$exe" ] || continue
             rm -f s.txt; LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" timeout 120 "$exe" || true
             grep -q "SMOKE OK $want win32" s.txt 2>/dev/null && break
           done

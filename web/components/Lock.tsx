@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BrandMark } from './BrandMark.tsx';
 import { api } from '../api.ts';
 import { Icon } from './Icon.tsx';
 
@@ -121,7 +122,7 @@ function LockScreen({ status, onUnlocked }: { status: LockStatus; onUnlocked: ()
   return (
     <div className="lock-screen">
       <div className="lock-card">
-        <div className="lock-brand"><span className="brand-mark">£</span> {status.appName || 'Ledger'}</div>
+        <div className="lock-brand"><BrandMark size={26} /> {status.appName || 'Coil'}</div>
         {status.avatar ? <img className="lock-avatar" src={status.avatar} alt="" /> : <span className="lock-avatar lock-initials">{initials}</span>}
         <h1 className="lock-name">{first ? `Welcome back, ${first}` : 'Welcome back'}</h1>
         <p className="lock-hint">{error ?? 'Enter your passcode'}</p>

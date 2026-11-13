@@ -485,6 +485,12 @@ export const MIGRATIONS: string[] = [
     snapshot TEXT NOT NULL
   );
   `,
+  // v15 — the app is now Coil, in navy and champagne gold: the old default accent (coral) and the
+  // old default name become the new ones. A colour or name you chose yourself is kept.
+  `
+  UPDATE settings SET value = replace(value, '"accent":"#ff5b45"', '"accent":"#d9c08e"') WHERE key = 'appearance';
+  UPDATE settings SET value = replace(value, '"appName":"Ledger"', '"appName":""') WHERE key = 'profile';
+  `,
 ];
 
 export function openDb(file: string): DB {

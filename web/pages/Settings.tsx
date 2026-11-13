@@ -241,7 +241,7 @@ function Restore() {
   );
 }
 
-const ACCENTS = ['#ff5b45', '#f97316', '#eab308', '#16a34a', '#0d9488', '#0ea5e9', '#2563eb', '#6366f1', '#8b5cf6', '#db2777', '#e11d48', '#475569'];
+const ACCENTS = ['#d9c08e', '#b39457', '#ff5b45', '#f97316', '#eab308', '#16a34a', '#0d9488', '#0ea5e9', '#2563eb', '#6366f1', '#8b5cf6', '#db2777', '#e11d48', '#475569'];
 const START_PAGES: [string, string][] = [['/', 'Overview'], ['/transactions', 'Transactions'], ['/budgets', 'Budgets'], ['/goals', 'Goals'], ['/bills', 'Bills and income'], ['/debts', 'Debts'], ['/investing', 'Investing'], ['/reports', 'Reports'], ['/accounts', 'Accounts']];
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -269,7 +269,7 @@ function NotificationsCard() {
   if (!d) return <Card title="Notifications"><p className="muted">Loading…</p></Card>;
   const s = d.settings;
   const mac = d.platform === 'darwin';
-  const appName = meta.profile.appName || 'Ledger';
+  const appName = meta.profile.appName || 'Coil';
   async function save(body: Record<string, unknown>) {
     try { setLocal(await api.put<NotifyState>('/api/notifications', body)); } catch (e: any) { toast(e.message, 'error'); }
   }
@@ -369,7 +369,7 @@ function ProfileCard() {
         </div>
         <div className="stack" style={{ gap: 10 }}>
           <Field label="Your name" hint="Used for the greeting on Overview."><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" maxLength={40} /></Field>
-          <Field label="App name" hint="Shown in the sidebar and the browser tab."><input value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Ledger" maxLength={30} /></Field>
+          <Field label="App name" hint="Shown in the sidebar and the browser tab."><input value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Coil" maxLength={30} /></Field>
           <div><button className="btn" onClick={save} disabled={name === meta.profile.name && appName === meta.profile.appName}>Save</button></div>
         </div>
       </div>

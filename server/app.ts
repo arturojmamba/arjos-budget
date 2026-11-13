@@ -113,7 +113,7 @@ route('POST', '/api/lock/unlock', ({ body, setCookie }) => {
 route('POST', '/api/lock/touchid', async ({ db, setCookie }) => {
   if (!lock?.enabled) return { ok: true };
   if (!desktop?.touchId?.available()) throw new ValidationError('Touch ID is not available');
-  const name = getProfile(db).appName || 'Ledger';
+  const name = getProfile(db).appName || 'Coil';
   if (!(await desktop.touchId.prompt(`unlock ${name}`))) throw new ValidationError('Touch ID was cancelled');
   setCookie(sessionCookie(lock.startSession()));
   return { ok: true };
@@ -433,7 +433,7 @@ route('PUT', '/api/notifications', ({ db, body }) => {
 route('POST', '/api/notifications/test', () => {
   const n = desktop?.notifications;
   if (!n?.supported()) throw new ValidationError('Notifications work in the desktop app');
-  if (!n.test()) throw new ValidationError("The notification couldn't be shown. Check that Ledger is allowed to send notifications in your system settings.");
+  if (!n.test()) throw new ValidationError("The notification couldn't be shown. Check that Coil is allowed to send notifications in your system settings.");
   return { ok: true };
 });
 route('POST', '/api/desktop/relaunch', () => { const host = needDesktop(); setTimeout(() => host.relaunch(), 150); return { ok: true }; });

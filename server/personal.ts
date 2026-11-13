@@ -16,7 +16,7 @@ export interface Appearance {
 export interface Profile { name: string; appName: string; avatar: string | null }
 
 export const DEFAULT_APPEARANCE: Appearance = {
-  theme: 'system', accent: '#ff5b45', density: 'comfortable', textSize: 'normal', showPence: true,
+  theme: 'system', accent: '#d9c08e', density: 'comfortable', textSize: 'normal', showPence: true,
   startPage: '/', startHidden: false, reduceMotion: false, weekStart: 'monday',
 };
 const PAGES = ['/', '/transactions', '/budgets', '/goals', '/bills', '/debts', '/reports', '/accounts'];
@@ -35,7 +35,7 @@ export function getProfile(db: DB): Profile {
 export function saveAppearance(db: DB, input: Partial<Appearance>) {
   const a = { ...getAppearance(db), ...input };
   if (!['system', 'light', 'dark'].includes(a.theme)) throw new ValidationError('Unknown theme');
-  if (!/^#[0-9a-fA-F]{6}$/.test(a.accent)) throw new ValidationError('Accent must be a colour like #ff5b45');
+  if (!/^#[0-9a-fA-F]{6}$/.test(a.accent)) throw new ValidationError('Accent must be a colour like #d9c08e');
   if (!['comfortable', 'compact'].includes(a.density)) throw new ValidationError('Unknown density');
   if (!['small', 'normal', 'large'].includes(a.textSize)) throw new ValidationError('Unknown text size');
   if (!PAGES.includes(a.startPage)) throw new ValidationError('Unknown start page');
