@@ -8,12 +8,13 @@ import { T212Card } from '../components/T212.tsx';
 import { AboutCard } from '../components/Updates.tsx';
 import { money } from '../format.ts';
 
-type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'budgeting' | 'trading212' | 'data' | 'about';
+type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'notifications' | 'budgeting' | 'trading212' | 'data' | 'about';
 const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'profile', label: 'Profile', icon: 'heart', hint: 'Your name, picture and the app’s name' },
   { key: 'appearance', label: 'Appearance', icon: 'sparkles', hint: 'Theme, colour, text size and layout' },
   { key: 'display', label: 'Numbers & privacy', icon: 'eye', hint: 'Pence, start page and hiding amounts' },
   { key: 'lock', label: 'Passcode', icon: 'lock', hint: 'Ask for a passcode when the app opens' },
+  { key: 'notifications', label: 'Notifications', icon: 'bell', hint: 'Bills, payday, your week and budgets' },
   { key: 'budgeting', label: 'Budgeting', icon: 'calendar', hint: 'How months and paydays line up' },
   { key: 'trading212', label: 'Trading 212', icon: 'trending-up', hint: 'Sync status and permissions' },
   { key: 'data', label: 'Data', icon: 'archive', hint: 'Health checks, backups and export' },
@@ -48,6 +49,7 @@ export function Settings() {
         {tab === 'appearance' && <AppearanceCard />}
         {tab === 'display' && <DisplayCard />}
         {tab === 'lock' && <PasscodeCard />}
+        {tab === 'notifications' && <NotificationsCard />}
         {tab === 'budgeting' && <BudgetingCard />}
         {tab === 'trading212' && <T212Card />}
         {tab === 'data' && <><HealthPanel /><DataCard /></>}
@@ -244,6 +246,97 @@ const START_PAGES: [string, string][] = [['/', 'Overview'], ['/transactions', 'T
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return <label className="switch" aria-label={label}><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /><span /></label>;
+}
+
+interface NotifyState {
+  supported: boolean; platform: string | null; openAtLogin: boolean | null;
+  settings: { enabled: boolean; bills: boolean; billDays: 1 | 3; payday: boolean; weekly: boolean; budgets: boolean; imports: boolean; updates: boolean; showAmounts: boolean; quietFrom: number; quietTo: number };
+}
+const hourLabel = (h: number) => h === 0 ? 'Midnight' : h === 12 ? 'Midday' : h < 12 ? `${h}am` : `${h - 12}pm`;
+
+function NotificationsCard() {
+  const { meta, toast } = useApp();
+  const st = useData(() => api.get<NotifyState>('/api/notifications'), []);
+  const [local, setLocal] = useState<NotifyState | null>(null);
+  const d = local ?? st.data;
+  if (!meta.desktop) {
+    return (
+      <Card title="Notifications">
+        <p className="muted">Notifications work in the desktop app, which can keep running in the background. In the browser version, nothing can reach you once the tab is closed.</p>
+      </Card>
+    );
+  }
+  if (!d) return <Card title="Notifications"><p className="muted">Loading…</p></Card>;
+  const s = d.settings;
+  const mac = d.platform === 'darwin';
+  const appName = meta.profile.appName || 'Ledger';
+  async function save(body: Record<string, unknown>) {
+    try { setLocal(await api.put<NotifyState>('/api/notifications', body)); } catch (e: any) { toast(e.message, 'error'); }
+  }
+  async function test() {
+    try { await api.post('/api/notifications/test', {}); toast('Sent. If nothing appeared, see the note below.'); } catch (e: any) { toast(e.message, 'error'); }
+  }
+  const row = (key: keyof NotifyState['settings'], title: string, hint: React.ReactNode, extra?: React.ReactNode) => (
+    <div className="pref-row">
+      <div><strong>{title}</strong><span className="muted small">{hint}</span>{s[key] && extra}</div>
+      <Toggle checked={!!s[key]} onChange={(v) => save({ [key]: v })} label={title} />
+    </div>
+  );
+  return (
+    <>
+      <Card title="Notifications" action={s.enabled ? <Badge tone="good"><Icon name="bell" size={12} /> On</Badge> : <Badge>Off</Badge>}>
+        <div className="pref-row">
+          <div><strong>Send notifications</strong><span className="muted small">They arrive while {appName} is running, even with its window closed. If the computer was asleep, you get anything you missed when it wakes, once.</span></div>
+          <Toggle checked={s.enabled} onChange={(v) => save({ enabled: v })} label="Send notifications" />
+        </div>
+        {s.enabled && (
+          <>
+            {row('bills', 'Bills due', 'Bills, subscriptions and debt payments coming up.',
+              <div className="pref-sub"><Segmented<'1' | '3'> value={String(s.billDays) as '1' | '3'} onChange={(v) => save({ billDays: Number(v) })} options={[{ value: '1', label: 'The day before' }, { value: '3', label: '3 days before' }]} /></div>)}
+            {row('payday', 'Payday', 'On payday, a nudge to go through the payday steps.')}
+            {row('weekly', 'Weekly summary', 'Monday morning: last week’s spending against a usual week.')}
+            {row('budgets', 'Budgets', 'When a budget is 80% used, and when it goes over. Once each.')}
+            {row('imports', 'Import reminder', 'When an account you import into hasn’t had a statement for a week.')}
+            {row('updates', 'Updates', 'When a new version is ready to install.')}
+          </>
+        )}
+      </Card>
+      {s.enabled && (
+        <Card title="Privacy and timing">
+          <div className="pref-row">
+            <div><strong>Show amounts</strong><span className="muted small">Notifications can show on your lock screen, so amounts are left out unless you turn this on: “Gym is due tomorrow” rather than “Gym is due tomorrow, £30.00”.</span></div>
+            <Toggle checked={s.showAmounts} onChange={(v) => save({ showAmounts: v })} label="Show amounts" />
+          </div>
+          <div className="pref-row">
+            <div><strong>Quiet hours</strong><span className="muted small">Nothing is sent in this time; anything due waits until it ends.</span></div>
+            <div className="row gap">
+              <select value={s.quietFrom} onChange={(e) => save({ quietFrom: Number(e.target.value) })} aria-label="Quiet from">
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
+              </select>
+              <span className="muted">to</span>
+              <select value={s.quietTo} onChange={(e) => save({ quietTo: Number(e.target.value) })} aria-label="Quiet until">
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
+              </select>
+            </div>
+          </div>
+          {d.openAtLogin !== null && (
+            <div className="pref-row">
+              <div><strong>Open at login</strong><span className="muted small">Starts {appName} in the background when you log in, with no window, so notifications arrive without you opening it.{!mac && ' Its icon sits by the clock: right-click it to open or quit.'}</span></div>
+              <Toggle checked={d.openAtLogin} onChange={(v) => save({ openAtLogin: v })} label="Open at login" />
+            </div>
+          )}
+          <div className="pref-row">
+            <div><strong>Try it</strong><span className="muted small">
+              {mac ? <>Nothing appeared? Open System Settings → Notifications → {appName} and allow notifications. The first one asks for permission.</>
+                : <>Nothing appeared? Open Settings → System → Notifications and make sure {appName} is on.</>}
+            </span></div>
+            <button className="btn" onClick={test}><Icon name="bell" size={16} /> Send a test</button>
+          </div>
+          {!mac && <p className="muted small">On Windows, closing the window keeps {appName} running by the clock while notifications are on. Quit it from that icon, or File → Quit.</p>}
+        </Card>
+      )}
+    </>
+  );
 }
 
 function ProfileCard() {

@@ -1416,3 +1416,4 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .update-notes { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .update-notes li.plain { list-style: none; margin-left: -20px; font-weight: 600; }
 .update-status p { margin: 0; }
+.pref-sub { margin-top: 8px; }

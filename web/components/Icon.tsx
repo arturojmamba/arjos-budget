@@ -3,6 +3,7 @@ import React from 'react';
 /** Small stroke icon set (Lucide-style, 24×24). */
 const PATHS: Record<string, string> = {
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
+  bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0',
   fingerprint: 'M12 11v4M8.6 7.6A5 5 0 0 1 17 11v2M7 11a5 5 0 0 1 .3-1.7M7 14v-3M16.7 16.5a12 12 0 0 1-.7 3M12 18v3M9.7 20.5A11 11 0 0 1 8.5 16M5 15.5a11 11 0 0 1-.6-4A7.6 7.6 0 0 1 17 6M19.6 9.5c.3.7.4 1.5.4 2.5v1',
   backspace: 'M21 5H8l-6 7 6 7h13zM17 9l-6 6M11 9l6 6',
   dashboard: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',

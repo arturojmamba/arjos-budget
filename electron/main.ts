@@ -7,18 +7,21 @@
  *  - The Trading 212 key is encrypted with the system keychain (Electron safeStorage) and kept in a
  *    file in the app-data folder; it never goes into the database.
  *  - Updates itself from the GitHub releases (electron/update.ts).
+ *  - Sends notifications (server/notify.ts decides what; this file shows them) every 15 minutes and
+ *    when the computer wakes, and can open at login without a window (--hidden).
  *  - LEDGER_SMOKE=1 starts the server, checks the API answers, and quits (used by the build);
  *    LEDGER_SMOKE_FILE=path also writes the result there (a packaged Windows app has no console).
  *
  * Bundled to dist-electron/main.mjs by scripts/build-desktop.mjs.
  */
-import { app, BrowserWindow, Menu, dialog, safeStorage, shell, nativeTheme, systemPreferences } from 'electron';
+import { app, BrowserWindow, Menu, Notification, Tray, dialog, safeStorage, shell, nativeTheme, powerMonitor, systemPreferences } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { startServer, type Running } from '../server/start.ts';
 import { backup } from '../server/db.ts';
 import { Updater } from './update.ts';
+import { runNotifications, notifySettings, updateNotice, wasSent, markSent, type Notice } from '../server/notify.ts';
 import type { DesktopHost } from '../server/app.ts';
 
 const PRODUCT = 'Ledger';
@@ -36,6 +39,14 @@ function releaseRepo(): string | null {
   } catch { return null; }
 }
 app.setName(PRODUCT);
+// Windows ties notifications to the app's ID (the installer's shortcut carries the same one).
+if (process.platform === 'win32') app.setAppUserModelId('app.ledger.desktop');
+const MAC = process.platform === 'darwin';
+/** Opened at login: start in the background, without a window. */
+function openedHidden(): boolean {
+  if (process.argv.includes('--hidden')) return true;
+  try { const l = app.getLoginItemSettings(); return MAC && (l.wasOpenedAtLogin || l.wasOpenedAsHidden); } catch { return false; }
+}
 
 const userData = app.getPath('userData');
 const dataDir = path.join(userData, 'data');
@@ -47,6 +58,8 @@ const windowFile = path.join(userData, 'window.json');
 let running: Running | null = null;
 let win: BrowserWindow | null = null;
 let quitting = false;
+let tray: Tray | null = null;
+let startHidden = false;
 
 // ---------------------------------------------------------------------------
 // Trading 212 key, encrypted by the OS keychain
@@ -118,7 +131,7 @@ function createWindow(url: string) {
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   if (s.maximized) win.maximize();
-  win.once('ready-to-show', () => win?.show());
+  win.once('ready-to-show', () => { if (!startHidden) win?.show(); startHidden = false; });
   // Links to other sites open in the normal browser; the app itself stays in the window.
   win.webContents.setWindowOpenHandler(({ url: target }) => {
     if (!target.startsWith(url)) void shell.openExternal(target);
@@ -132,11 +145,79 @@ function createWindow(url: string) {
   };
   win.on('close', (e) => {
     remember();
-    // macOS: closing the window keeps the app running (sync carries on); quit with ⌘Q.
-    if (process.platform === 'darwin' && !quitting) { e.preventDefault(); win?.hide(); }
+    // macOS: closing the window keeps the app running (sync and notifications carry on); quit with ⌘Q.
+    // Windows: the same while notifications are on, with an icon by the clock to reopen or quit.
+    if (quitting) return;
+    if (MAC) { e.preventDefault(); win?.hide(); return; }
+    if (running && notifySettings(running.db).enabled) { e.preventDefault(); win?.hide(); void showTray(); }
   });
   win.on('closed', () => { win = null; });
   void win.loadURL(url);
+}
+
+function openRoute(route: string) {
+  if (!running) return;
+  if (!win) createWindow(running.url);
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
+  void win.webContents.executeJavaScript(`location.hash = ${JSON.stringify('#' + route)}`);
+}
+
+/** Windows: an icon by the clock while the window is closed, to reopen or quit. */
+async function showTray() {
+  if (MAC || tray) return;
+  try {
+    tray = new Tray(await app.getFileIcon(process.execPath, { size: 'small' }));
+    tray.setToolTip(`${PRODUCT} is running, so notifications can arrive`);
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: `Open ${PRODUCT}`, click: () => openRoute('/') },
+      { type: 'separator' },
+      { label: `Quit ${PRODUCT}`, click: () => { quitting = true; app.quit(); } },
+    ]));
+    tray.on('click', () => openRoute('/'));
+  } catch { /* no tray: the window just stays hidden; opening Ledger again shows it */ }
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+
+const live = new Set<Notification>(); // keep a reference so click handlers survive garbage collection
+function showNotice(n: Notice): boolean {
+  if (!Notification.isSupported()) return false;
+  try {
+    const note = new Notification({ title: n.title, body: n.body });
+    live.add(note);
+    note.on('click', () => { live.delete(note); openRoute(n.route); });
+    note.on('close', () => live.delete(note));
+    note.show();
+    setTimeout(() => live.delete(note), 24 * 3600e3);
+    return true;
+  } catch { return false; }
+}
+
+function startNotifications(updater: Updater | null) {
+  let timer: NodeJS.Timeout | null = null;
+  const run = () => {
+    if (!running) return;
+    try {
+      runNotifications(running.db, new Date(), showNotice);
+      // A downloaded update: say so once, unless you're using the app (the banner shows it there).
+      const s = notifySettings(running.db);
+      const st = updater?.info().state;
+      if (s.enabled && s.updates && st?.status === 'ready' && !win?.isFocused()) {
+        const n = updateNotice(st.available.version);
+        if (!wasSent(running.db, n.key) && showNotice(n)) markSent(running.db, [n.key]);
+      }
+    } catch (e) { console.error('Notifications:', e); }
+  };
+  const soon = (ms: number) => { if (timer) clearTimeout(timer); timer = setTimeout(run, ms); };
+  soon(30_000);
+  setInterval(run, 15 * 60_000);
+  // After sleep, catch up a minute after waking (the network and clock settle first).
+  powerMonitor.on('resume', () => soon(60_000));
+  powerMonitor.on('unlock-screen', () => soon(5_000));
+  return { run: () => soon(1_000) };
 }
 
 function buildMenu() {
@@ -188,6 +269,7 @@ if (!app.requestSingleInstanceLock()) {
     loadKey();
     const repo = releaseRepo();
     const updater = repo ? new Updater(repo, () => { if (running) backup(running.db, backupDir); }, (m) => console.log(m)) : null;
+    let notifier: { run(): void } | null = null;
     const host: DesktopHost = {
       version: app.getVersion(),
       platform: process.platform,
@@ -213,6 +295,16 @@ if (!app.requestSingleInstanceLock()) {
           try { win?.show(); await systemPreferences.promptTouchID(reason); return true; } catch { return false; }
         },
       } : undefined,
+      notifications: {
+        supported: () => Notification.isSupported(),
+        test: () => showNotice({ key: 'test', kind: 'test', title: `Notifications are on`, body: `This is how ${PRODUCT} will let you know about bills, payday and your week.`, route: '/settings?tab=notifications' }),
+        run: () => notifier?.run(),
+        openAtLogin: () => { if (!app.isPackaged) return null; try { return app.getLoginItemSettings().openAtLogin; } catch { return null; } },
+        setOpenAtLogin: (on: boolean) => {
+          if (!app.isPackaged) throw new Error('Opening at login works in the installed app.');
+          app.setLoginItemSettings({ openAtLogin: on, openAsHidden: true, args: ['--hidden'] });
+        },
+      },
     };
     try {
       running = await startServer({
@@ -258,8 +350,11 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     buildMenu();
+    startHidden = openedHidden();
     createWindow(running.url);
+    if (startHidden && !MAC) void showTray();
     updater?.schedule();
+    notifier = startNotifications(updater);
     app.on('activate', () => { if (win) win.show(); else if (running) createWindow(running.url); });
   });
 

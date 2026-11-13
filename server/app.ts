@@ -35,6 +35,7 @@ import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
+import { notifySettings, updateNotifySettings } from './notify.ts';
 import { spendingExplorer, cutBack, habits, budgetRecord, cashFlow, compareDrivers, weekly } from './insights.ts';
 
 type Handler = (ctx: { db: DB; params: Record<string, string>; query: URLSearchParams; body: any; session?: string; setCookie: (c: string) => void }) => unknown;
@@ -78,6 +79,17 @@ export interface DesktopHost {
   };
   /** Touch ID on Macs that have it: unlock without typing the passcode. */
   touchId?: { available(): boolean; prompt(reason: string): Promise<boolean> };
+  /** System notifications and opening at login. */
+  notifications?: {
+    supported(): boolean;
+    /** Show a test notification now (ignores quiet hours). */
+    test(): boolean;
+    /** Check now, e.g. after the settings change. */
+    run(): void;
+    /** null when it can't be set (running from source rather than installed). */
+    openAtLogin(): boolean | null;
+    setOpenAtLogin(on: boolean): void;
+  };
 }
 let desktop: DesktopHost | null = null;
 // ---------- Passcode lock ----------
@@ -401,6 +413,28 @@ route('PUT', '/api/desktop/update/auto', ({ body }) => {
   if (!u) throw new ValidationError('Updates work in the desktop app');
   u.setAuto(body?.on !== false);
   return { supported: true, ...(u.info() as object) };
+});
+// ---------- Notifications (desktop app) ----------
+const notifyState = (db: Parameters<typeof notifySettings>[0]) => {
+  const n = desktop?.notifications;
+  return { supported: !!n?.supported(), platform: desktop?.platform ?? null, openAtLogin: n ? n.openAtLogin() : null, settings: notifySettings(db) };
+};
+route('GET', '/api/notifications', ({ db }) => notifyState(db));
+route('PUT', '/api/notifications', ({ db, body }) => {
+  const { openAtLogin, ...rest } = (body ?? {}) as Record<string, unknown>;
+  updateNotifySettings(db, rest);
+  if (typeof openAtLogin === 'boolean') {
+    if (!desktop?.notifications) throw new ValidationError('Opening at login works in the desktop app');
+    try { desktop.notifications.setOpenAtLogin(openAtLogin); } catch (e: any) { throw new ValidationError(e?.message ?? "Couldn't change that"); }
+  }
+  desktop?.notifications?.run();
+  return notifyState(db);
+});
+route('POST', '/api/notifications/test', () => {
+  const n = desktop?.notifications;
+  if (!n?.supported()) throw new ValidationError('Notifications work in the desktop app');
+  if (!n.test()) throw new ValidationError("The notification couldn't be shown. Check that Ledger is allowed to send notifications in your system settings.");
+  return { ok: true };
 });
 route('POST', '/api/desktop/relaunch', () => { const host = needDesktop(); setTimeout(() => host.relaunch(), 150); return { ok: true }; });
 route('GET', '/api/t212/status', ({ db }) => syncStatus(db, trading212Config()));

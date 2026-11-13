@@ -12,6 +12,7 @@ Made for UK banking: pay on the last working day funds the next month, bank holi
 - **Budgets, savings goals and debts**, with payoff plans
 - **Investing** via Trading 212 (read-only): returns, fees and your ISA allowance
 - **Reports:** where the money went, week by week or year by year
+- **Notifications** for bills due, payday, your week and budgets, with amounts hidden unless you turn them on
 - **Passcode lock**, with Touch ID on Mac
 
 ## Get the app
