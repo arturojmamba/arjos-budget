@@ -72,7 +72,7 @@ function clearKey() {
 // First run: start fresh or bring in an existing database
 
 async function firstRun(): Promise<boolean> {
-  if (fs.existsSync(dbFile) || SMOKE) return true;
+  if (fs.existsSync(dbFile) || SMOKE || UPDATE_TEST) return true;
   fs.mkdirSync(dataDir, { recursive: true });
   const { response } = await dialog.showMessageBox({
     type: 'question',

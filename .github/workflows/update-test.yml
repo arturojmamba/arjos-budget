@@ -1,0 +1,94 @@
+# Installs the previous release on a Mac and a Windows machine, lets it update itself to `release`
+# through the real updater (download, checksum, swap), and checks the new version starts.
+# Runs after every release; can also be run by hand for an existing release.
+name: Update test
+
+on:
+  workflow_call:
+    inputs:
+      release: { type: string, required: true }
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'The release to update to (e.g. v1.2.1)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE: ${{ inputs.release }}
+      # LEDGER_SMOKE also skips the first-run "Welcome" box on a fresh machine (it's in every version from 1.2.0).
+      TEST_ENV: LEDGER_SMOKE=1 LEDGER_UPDATE_TEST=1
+    steps:
+      - name: Find the previous release
+        id: prev
+        run: |
+          prev="$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 --json tagName --jq '.[].tagName' | sort -V | awk -v r="$RELEASE" '$0 == r { print last; exit } { last = $0 }')"
+          echo "previous: $prev"
+          # Versions before 1.2.0 have no updater.
+          if [ -z "$prev" ] || [ "$(printf '%s\nv1.2.0\n' "$prev" | sort -V | head -1)" != "v1.2.0" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+          echo "tag=$prev" >> "$GITHUB_OUTPUT"
+
+      - name: Install the previous version (Mac)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'macOS'
+        run: |
+          gh release download "${{ steps.prev.outputs.tag }}" -R "$GITHUB_REPOSITORY" -p '*-mac-arm64.dmg' -O old.dmg
+          hdiutil attach -nobrowse -mountpoint /tmp/old old.dmg
+          cp -R /tmp/old/Ledger.app /Applications/
+          hdiutil detach /tmp/old
+          defaults read /Applications/Ledger.app/Contents/Info CFBundleShortVersionString
+
+      - name: Let it update itself (Mac)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'macOS'
+        run: |
+          env $TEST_ENV LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_SMOKE_FILE="$PWD/u.txt" /Applications/Ledger.app/Contents/MacOS/Ledger || true
+          cat u.txt; grep -q "UPDATE TEST OK" u.txt
+          want="${RELEASE#v}"
+          for i in $(seq 1 90); do
+            v="$(defaults read /Applications/Ledger.app/Contents/Info CFBundleShortVersionString 2>/dev/null || true)"
+            [ "$v" = "$want" ] && break; sleep 2
+          done
+          echo "installed: $v"; cat ~/Library/Application\ Support/Ledger/update.log || true
+          [ "$v" = "$want" ]
+          LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" /Applications/Ledger.app/Contents/MacOS/Ledger || true
+          cat s.txt; grep -q "SMOKE OK $want darwin" s.txt
+
+      - name: Install the previous version (Windows)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          gh release download "${{ steps.prev.outputs.tag }}" -R $env:GITHUB_REPOSITORY -p 'Ledger-Setup-*.exe' -O old.exe
+          Start-Process -FilePath .\old.exe -ArgumentList '/S' -Wait
+          Test-Path "$env:LOCALAPPDATA\Programs\Ledger\Ledger.exe"
+
+      - name: Let it update itself (Windows)
+        if: steps.prev.outputs.skip == 'false' && runner.os == 'Windows'
+        run: |
+          exe="$LOCALAPPDATA/Programs/Ledger/Ledger.exe"
+          env $TEST_ENV LEDGER_GITHUB_TOKEN="$GH_TOKEN" LEDGER_SMOKE_FILE="$PWD/u.txt" timeout 300 "$exe" || true
+          cat u.txt; grep -q "UPDATE TEST OK" u.txt
+          want="${RELEASE#v}"
+          for i in $(seq 1 60); do
+            sleep 3
+            tasklist | grep -qi "Ledger-Setup" && continue
+            rm -f s.txt; LEDGER_SMOKE=1 LEDGER_SMOKE_FILE="$PWD/s.txt" timeout 120 "$exe" || true
+            grep -q "SMOKE OK $want win32" s.txt 2>/dev/null && break
+          done
+          cat s.txt; grep -q "SMOKE OK $want win32" s.txt
+
+      - name: Nothing to test
+        if: steps.prev.outputs.skip == 'true'
+        run: echo "The previous release has no updater (before 1.2.0), so there's nothing to update from."
