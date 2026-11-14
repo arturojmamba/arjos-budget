@@ -3,6 +3,13 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.9.1",
+    "date": "2026-11-14",
+    "changes": [
+      "The Coil snake now coils clockwise, head first, the same way the pace rings fill"
+    ]
+  },
+  {
     "version": "1.9.0",
     "date": "2026-11-14",
     "changes": [

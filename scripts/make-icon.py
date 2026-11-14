@@ -13,9 +13,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NAVY, GOLD = '#0F1A2E', '#D9C08E'
 GOLD_LIGHT = '#F1E5C6'
 R = 28  # ring radius, in a 100 x 100 box
+# The snake travels clockwise, head first, like the pace rings fill. Angles below are drawn as if it
+# went the other way and mirrored left to right here (S = -1); set S = 1 for the old anticlockwise coil.
+S = -1
 
 def pt(a, r=R):
-    t = math.radians(a); return (50 + r * math.sin(t), 50 - r * math.cos(t))
+    t = math.radians(a); return (50 + S * r * math.sin(t), 50 - r * math.cos(t))
 
 def body_path(start=14, end=340, w=11, span=114, tip=0.7):
     """The body: full width from the neck, then narrowing smoothly to a fine tail."""
@@ -33,11 +36,11 @@ def body_path(start=14, end=340, w=11, span=114, tip=0.7):
 def head_path(at=7, rx=9.5, ry=7.4):
     """A mamba's head: long, flat, a little squared at the snout; pointing back along the ring at the tail."""
     x, y = pt(at)
-    P = lambda fx, fy: f'{x + rx * fx:.2f} {y + ry * fy:.2f}'
+    P = lambda fx, fy: f'{x + S * rx * fx:.2f} {y + ry * fy:.2f}'
     d = (f'M{P(-1, 0)} C{P(-1, -1)} {P(0.6, -1)} {P(0.9, -0.55)} '
          f'C{P(1.05, -0.35)} {P(1.05, 0.35)} {P(0.9, 0.55)} '
          f'C{P(0.6, 1)} {P(-1, 1)} {P(-1, 0)} Z')
-    return d, f'rotate({at + 180:.1f} {x:.2f} {y:.2f})'
+    return d, f'rotate({S * (at + 180):.1f} {x:.2f} {y:.2f})'
 
 def eye(at=7):
     return pt(at - 3.5, R + 2.2)
