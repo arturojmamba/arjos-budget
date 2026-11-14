@@ -768,7 +768,7 @@ input[type=radio] { width: 16px; height: 16px; accent-color: var(--accent); marg
 .goal-figures { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 .goal-saved { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .ring { position: relative; display: inline-grid; place-items: center; flex-shrink: 0; }
-.ring svg { position: absolute; inset: 0; }
+.ring > svg { position: absolute; inset: 0; }
 .ring circle { transition: stroke-dasharray 0.4s ease; }
 .ring-inner { position: relative; display: grid; place-items: center; }
 .goal-emoji { font-size: 24px; line-height: 1; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
@@ -1580,9 +1580,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 .pace-rings .pr-track { stroke: var(--track); }
 .pace-rings .pr-time { stroke: var(--accent-line); transition: stroke-dashoffset 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
 .pace-rings .pr-money { stroke: var(--good); transition: stroke-dashoffset 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
-.pace-rings.tone-warn .pr-money, .pace-rings.tone-warn .pr-head circle:first-child { stroke: var(--warn); fill: var(--warn); }
-.pace-rings.tone-bad .pr-money, .pace-rings.tone-bad .pr-head circle:first-child { stroke: var(--bad); fill: var(--bad); }
 .pace-rings .pr-head circle:first-child { fill: var(--good); }
+.pace-rings.tone-warn .pr-money { stroke: var(--warn); }
+.pace-rings.tone-warn .pr-head circle:first-child { fill: var(--warn); }
+.pace-rings.tone-bad .pr-money { stroke: var(--bad); }
+.pace-rings.tone-bad .pr-head circle:first-child { fill: var(--bad); }
 .pace-rings .pr-head .pr-eye { fill: var(--surface); }
 .pace-key { display: flex; gap: 10px; font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
 .pace-key span { display: inline-flex; align-items: center; gap: 4px; }
@@ -1602,3 +1604,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 .sub-emoji svg { display: block; margin: 0 auto; }
 .goal-emoji svg, .week-icon svg { display: block; }
 .payday-rings .pace-rings .pr-track { stroke: var(--border); }
+
+/* This month: biggest spends fill whatever room the card has beside Spending by category. */
+.plan-card.fit-row .pace { flex: 1 1 auto; min-height: 0; }
+.plan-card.fit-row .pace-top { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.plan-card.fit-row .pace-top-list { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+/* Money and debt: when one group is longer than the other two together, stack those two beside it. */
+.money-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+@media (min-width: 900px) { .money-groups.stacked { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat-hero-top { flex-wrap: wrap; justify-content: flex-start; row-gap: 4px; }
+.stat-hero-top .stat-label { white-space: nowrap; margin-right: auto; }
+@media (max-width: 1440px) { .stat-hero-rings .pace-rings { width: 78px; height: 78px; } .stat-hero-rings .pace-key { flex-direction: column; gap: 3px; align-items: flex-start; } }

@@ -79,7 +79,7 @@ const EMOJI_ICONS: Record<string, string> = {
   '☕': 'coffee', '🚌': 'bus', '🚆': 'bus', '🚇': 'bus', '🚗': 'car', '⛽': 'car', '🛍': 'shopping-bag', '👕': 'shopping-bag',
   '📺': 'device-tv', '🎬': 'device-tv', '🔁': 'repeat', '🔄': 'repeat', '⚡': 'bolt', '💡': 'bolt', '🏠': 'home', '🏡': 'home',
   '💪': 'dumbbell', '🏋': 'dumbbell', '💊': 'pill', '🩺': 'heartbeat', '❤': 'heart', '✈': 'plane', '🧳': 'plane', '💅': 'sparkles',
-  '✨': 'sparkles', '🎓': 'school', '📚': 'book', '📖': 'book', '💸': 'percentage', '🏦': 'percentage', '📦': 'package', '💼': 'briefcase',
+  '✨': 'sparkles', '🎓': 'school', '📚': 'book', '📖': 'book', '💸': 'percentage', '🏦': 'percentage', '📦': 'package', '💼': 'briefcase', '🏛': 'briefcase', '🧾': 'file', '💳': 'wallet', '🛟': 'shield',
   '💻': 'code', '🎁': 'gift', '💝': 'heart', '📈': 'trending-up', '💵': 'cash', '💰': 'cash', '💷': 'cash', '🐷': 'piggy-bank',
   '📱': 'phone', '🛡': 'shield', '🐾': 'paw', '🐶': 'paw', '🐱': 'paw', '👶': 'baby', '🎯': 'target', '🎮': 'game', '🎵': 'music', '🎧': 'music',
 };

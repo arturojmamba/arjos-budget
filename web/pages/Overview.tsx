@@ -82,7 +82,7 @@ export function Overview({ month }: { month: string }) {
       <div className={`ov-row ${showPlan ? 'ov-wide-narrow' : ''}`}>
         <SpendingByCategory s={s} month={month} />
         {showPlan && (
-          <Card title={isCurrent ? 'This month' : monthLabel(month)} action={<button className="link-btn" onClick={() => navigate('/bills')}>Bills</button>}>
+          <Card className="plan-card fit-row" title={isCurrent ? 'This month' : monthLabel(month)} action={<button className="link-btn" onClick={() => navigate('/bills')}>Bills</button>}>
             <PlanBreakdown plan={plan} />
             <MonthPace s={s} plan={plan} payday={isCurrent ? payday : null} today={meta.today} catIcon={catIcon} hero={heroOn} />
           </Card>
@@ -163,51 +163,63 @@ const GROUPS: { key: string; title: string; match: (a: Summary['accounts'][numbe
 function MoneyAndDebt({ s }: { s: Summary }) {
   const top = s.accounts.filter((a) => a.parentId === null);
   const children = (id: number) => s.accounts.filter((a) => a.parentId === id);
+  const groups = GROUPS.map((g) => {
+    const rows = top.filter(g.match).reduce((n, a) => n + 1 + children(a.id).length, 0);
+    const el = (() => {
+      const list = top.filter(g.match);
+      const all = s.accounts.filter(g.match);
+      const total = all.reduce((sum, a) => sum + a.balance, 0);
+      const isDebt = g.key === 'debt';
+      return (
+        <section key={g.key} className="money-group">
+          <header>
+            <span className="field-label">{g.title}</span>
+            {isDebt
+              ? <button className="money-group-link" onClick={() => navigate('/debts')} title="See debts"><Money value={-total} className="strong tone-bad" /></button>
+              : <Money value={total} className="strong" />}
+          </header>
+          {list.length === 0 ? <p className="muted small">None yet</p> : (
+            <ul className="acct-mini">
+              {list.map((a) => (
+                <React.Fragment key={a.id}>
+                  <li>
+                    <button onClick={() => navigate(`/transactions${qs({ accountId: a.id })}`)}>
+                      <span className={`dot ${a.isLiability ? 'dot-debt' : ''}`} style={{ background: a.colour }} />
+                      <span className="grow">{a.name}</span>
+                      {a.isLiability
+                        ? <span className="money">{a.balance < 0 ? money(-a.balance) : a.balance === 0 ? <span className="muted">Paid off</span> : `${money(a.balance)} credit`}</span>
+                        : <Money value={a.balance} />}
+                    </button>
+                  </li>
+                  {children(a.id).map((c) => (
+                    <li key={c.id} className="acct-mini-child">
+                      <button onClick={() => navigate(`/transactions${qs({ accountId: c.id })}`)}>
+                        <span className="dot" style={{ background: c.colour }} />
+                        <span className="grow">{c.name}</span>
+                        <Money value={c.balance} />
+                      </button>
+                    </li>
+                  ))}
+                </React.Fragment>
+              ))}
+            </ul>
+          )}
+        </section>
+      );
+    })();
+    return { key: g.key, rows: Math.max(1, rows), el };
+  });
+  // One long group beside two short ones leaves big gaps under the short ones: stack those instead.
+  const longest = [...groups].sort((x, y) => y.rows - x.rows)[0];
+  const rest = groups.reduce((n, g) => n + g.rows, 0) - longest.rows;
+  const stack = longest.rows >= rest + 1 ? longest.key : null;
   return (
     <Card title="Money and debt" action={<span className="row gap"><span className="muted small">Net worth <Money value={s.netWorth} /></span><button className="link-btn" onClick={() => navigate('/accounts')}>Accounts</button></span>}>
-      <div className="money-groups">
-        {GROUPS.map((g) => {
-          const list = top.filter(g.match);
-          const all = s.accounts.filter(g.match);
-          const total = all.reduce((sum, a) => sum + a.balance, 0);
-          const isDebt = g.key === 'debt';
-          return (
-            <section key={g.key} className="money-group">
-              <header>
-                <span className="field-label">{g.title}</span>
-                {isDebt
-                  ? <button className="money-group-link" onClick={() => navigate('/debts')} title="See debts"><Money value={-total} className="strong tone-bad" /></button>
-                  : <Money value={total} className="strong" />}
-              </header>
-              {list.length === 0 ? <p className="muted small">None yet</p> : (
-                <ul className="acct-mini">
-                  {list.map((a) => (
-                    <React.Fragment key={a.id}>
-                      <li>
-                        <button onClick={() => navigate(`/transactions${qs({ accountId: a.id })}`)}>
-                          <span className={`dot ${a.isLiability ? 'dot-debt' : ''}`} style={{ background: a.colour }} />
-                          <span className="grow">{a.name}</span>
-                          {a.isLiability
-                            ? <span className="money">{a.balance < 0 ? money(-a.balance) : a.balance === 0 ? <span className="muted">Paid off</span> : `${money(a.balance)} credit`}</span>
-                            : <Money value={a.balance} />}
-                        </button>
-                      </li>
-                      {children(a.id).map((c) => (
-                        <li key={c.id} className="acct-mini-child">
-                          <button onClick={() => navigate(`/transactions${qs({ accountId: c.id })}`)}>
-                            <span className="dot" style={{ background: c.colour }} />
-                            <span className="grow">{c.name}</span>
-                            <Money value={c.balance} />
-                          </button>
-                        </li>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
+      <div className={`money-groups ${stack ? 'stacked' : ''}`}>
+        {stack ? <>
+          <div className="money-col">{groups.filter((g) => g.key !== stack).map((g) => g.el)}</div>
+          <div className="money-col">{groups.find((g) => g.key === stack)!.el}</div>
+        </> : groups.map((g) => g.el)}
       </div>
     </Card>
   );
@@ -336,6 +348,7 @@ function MonthPace({ s, plan, payday, today, catIcon, hero }: { s: Summary; plan
   const daysLeft = payday ? Math.max(1, daysBetween(today, payday)) : Math.max(1, p.daysInMonth - p.day + 1);
   const perDay = plan.freeToSpend > 0 ? Math.floor(plan.freeToSpend / daysLeft) : 0;
   const hasPlan = plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0);
+  const fit = useFitList(s.topSpends.length);
   return (
     <div className="pace">
       {!hero && <div className="pace-tiles">
@@ -365,8 +378,9 @@ function MonthPace({ s, plan, payday, today, catIcon, hero }: { s: Summary; plan
       {s.topSpends.length > 0 && (
         <div className="pace-top">
           <span className="muted small strong-label">Biggest spends</span>
+          <div className="pace-top-list" ref={fit.ref}>
           <ul>
-            {s.topSpends.map((t) => {
+            {s.topSpends.slice(0, fit.size).map((t) => {
               const c = categories.find((x) => x.id === t.categoryId);
               return (
                 <li key={t.id}>
@@ -377,10 +391,36 @@ function MonthPace({ s, plan, payday, today, catIcon, hero }: { s: Summary; plan
               );
             })}
           </ul>
+          </div>
         </div>
       )}
     </div>
   );
+}
+
+/** As many biggest spends as fit the card (it takes its height from its neighbour); 3 when stacked. */
+function useFitList(total: number, fallback = 3) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState(Math.min(total, fallback));
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const card = el.closest<HTMLElement>('.fit-row');
+      if (!card || !getComputedStyle(card).contain.includes('size')) { setSize(Math.min(total, fallback)); return; }
+      const li = el.querySelector('li');
+      const rowH = li?.getBoundingClientRect().height || 26;
+      const gap = 8;
+      const room = el.clientHeight - 8;
+      const n = Math.max(1, Math.min(total, Math.floor((room + gap) / (rowH + gap))));
+      setSize((cur) => (cur === n ? cur : n));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [total, fallback]);
+  return { ref, size };
 }
 
 /** Averages over the months shown in the chart that have any data. */

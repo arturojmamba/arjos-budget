@@ -401,7 +401,7 @@ export function monthSpending(db: DB, month: string) {
 }
 
 /** The largest single purchases of a month. */
-function topSpends(db: DB, month: string, n = 3) {
+function topSpends(db: DB, month: string, n = 15) {
   return db
     .prepare(
       `SELECT t.id AS id, t.date AS date, t.description AS description, SUM(-p.amount) AS amount,
