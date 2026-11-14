@@ -352,7 +352,11 @@ function periodKeyOf(date: string, period: string) {
 export function cashFlow(db: DB, months = 12, today = todayIso()) {
   const t = trends(db, months, today);
   const cur = monthOf(today);
-  const flow = t.flow.map((f) => ({ ...f, savingsRate: f.income > 0 ? f.saved / f.income : null, current: f.month === cur }));
+  const months0 = t.flow.filter((f) => f.month !== cur && (f.income > 0 || f.spending > 0));
+  const typicalIncome = months0.length ? sum(months0.map((f) => f.income)) / months0.length : 0;
+  // A month with hardly any income (pay landed the month before, a gap between jobs) makes the rate
+  // meaningless, thousands of percent, and flattens the chart. Leave it out instead.
+  const flow = t.flow.map((f) => ({ ...f, savingsRate: f.income > 0 && f.income >= typicalIncome * 0.25 ? f.saved / f.income : null, current: f.month === cur }));
   const full = flow.filter((f) => !f.current && (f.income > 0 || f.spending > 0));
   const avg = (k: 'income' | 'spending' | 'saved' | 'fixed' | 'flexible') => (full.length ? Math.round(sum(full.map((f) => f[k])) / full.length) : 0);
   return {

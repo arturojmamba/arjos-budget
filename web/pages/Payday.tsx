@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, qs } from '../api.ts';
-import { money, monthLabel, parseAmount, pct, penceToInput, shortDate } from '../format.ts';
+import { money, monthLabel, parseAmount, pct, penceToInput, shortDate, niceName } from '../format.ts';
 import { Badge, Card, Money, Progress, useApp, useConfirm, useData } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate, setParams } from '../router.ts';
@@ -80,9 +80,8 @@ export function Payday({ params }: { params: URLSearchParams }) {
     <div className={`page payday ${loading ? 'stale' : ''}`}>
       <div className="payday-head">
         <div>
-          <span className="eyebrow">{upcoming ? 'Planning ahead' : isCurrent ? 'This payday' : 'Past payday'}</span>
-          <h2>💷 Payday · {shortDate(data.cycle)}</h2>
-          <span className="muted">Pays for {monthLabel(data.period)} · next payday {shortDate(data.next)}{data.daysToNext > 0 && data.cycle <= data.today ? ` (in ${data.daysToNext} day${data.daysToNext === 1 ? '' : 's'})` : ''}</span>
+          <h2>{shortDate(data.cycle)}</h2>
+          <span className="muted">{upcoming ? 'Planning ahead' : isCurrent ? 'This payday' : 'Past payday'} · pays for {monthLabel(data.period)} · next payday {shortDate(data.next)}{data.daysToNext > 0 && data.cycle <= data.today ? ` (in ${data.daysToNext} day${data.daysToNext === 1 ? '' : 's'})` : ''}</span>
         </div>
         <div className="payday-nav">
           <button className="icon-btn" aria-label="Previous payday" onClick={() => setParams('/payday', { cycle: prevCycle })}><Icon name="chevron-left" size={18} /></button>
@@ -93,12 +92,16 @@ export function Payday({ params }: { params: URLSearchParams }) {
 
       <div className="payday-grid">
       <div className="payday-steps">
+      <div className="payday-progress" aria-label={`${doneCount} of ${stepKeys.length} steps done`}>
+        <div className="payday-pips">{stepKeys.map((k) => <span key={k} className={`pip ${isDone(k) ? 'on' : ''} ${shown === k ? 'cur' : ''}`} />)}</div>
+        <span className="muted small">{data.completedAt ? `All done · finished ${shortDate(data.completedAt.slice(0, 10))}` : `${doneCount} of ${stepKeys.length} done`}</span>
+      </div>
       {/* 1. Pay */}
       <Step {...stepProps('pay')} n={1} title="Check your pay"
         summary={data.pay.arrived ? `${money(data.pay.actual!)} arrived ${shortDate(data.pay.actualDate!)}` : upcoming ? `Expecting ${data.pay.expected != null ? money(data.pay.expected) : 'your pay'}` : 'Not in your imports yet'}>
         {data.pay.arrived ? (
           <div className="pay-check">
-            <div className="pay-big"><Money value={data.pay.actual!} /><span className="muted small">{data.pay.description} · {shortDate(data.pay.actualDate!)}</span></div>
+            <div className="pay-big"><Money value={data.pay.actual!} /><span className="muted small">{niceName(data.pay.description)} · {shortDate(data.pay.actualDate!)}</span></div>
             {data.pay.diff == null ? null : data.pay.diff === 0
               ? <Badge tone="good"><Icon name="check" size={12} /> Exactly what you expected</Badge>
               : <Badge tone={data.pay.diff > 0 ? 'good' : 'warn'}>{money(Math.abs(data.pay.diff))} {data.pay.diff > 0 ? 'more' : 'less'} than the usual {money(data.pay.expected!)}</Badge>}
@@ -113,7 +116,7 @@ export function Payday({ params }: { params: URLSearchParams }) {
         {data.pay.other.length > 0 && (
           <div className="sub-list">
             <span className="muted small">Other money in for {monthLabel(data.period, true)}</span>
-            {data.pay.other.map((o, i) => <div key={i} className="row small"><span className="ellipsis">{o.description} <span className="muted">· {shortDate(o.date)}</span></span><span className="spacer" /><Money value={o.amount} /></div>)}
+            {data.pay.other.map((o, i) => <div key={i} className="row small"><span className="ellipsis">{niceName(o.description)} <span className="muted">· {shortDate(o.date)}</span></span><span className="spacer" /><Money value={o.amount} /></div>)}
           </div>
         )}
         <StepFoot onDone={() => check('pay')} label="Pay looks right" done={data.steps.pay} onUndo={() => check('pay', false)} />
@@ -238,21 +241,6 @@ export function Payday({ params }: { params: URLSearchParams }) {
             {SPLIT.map((x) => <li key={x.key}><i className="key-box" style={{ background: x.colour }} /><span className="grow">{x.label}</span><span>{money(p[x.key].total)}</span></li>)}
             <li className={p.buffer >= 0 ? 'tone-good' : 'tone-bad'}><i className="key-box split-buffer" /><span className="grow"><strong>{p.buffer >= 0 ? 'Buffer' : 'Short by'}</strong></span><strong>{money(Math.abs(p.buffer))}</strong></li>
           </ul>
-        </Card>
-        <Card title="Steps" action={<span className="muted small">{data.completedAt ? 'All done' : `${doneCount} of ${stepKeys.length}`}</span>}>
-          <div className="payday-pips">{stepKeys.map((k) => <span key={k} className={`pip ${isDone(k) ? 'on' : ''} ${shown === k ? 'cur' : ''}`} />)}</div>
-          <ol className="step-index">
-            {stepKeys.map((k) => (
-              <li key={k}>
-                <button className={`${shown === k ? 'cur' : ''} ${isDone(k) ? 'done' : ''}`} onClick={() => setOpen(k)}>
-                  <span className="si-dot">{isDone(k) ? <Icon name="check" size={12} /> : null}</span>
-                  <span className="grow">{STEP_NAMES[k]}</span>
-                  {k === 'moves' && <span className="muted small">{data.moves.filter((m) => m.status === 'done').length}/{data.moves.length}</span>}
-                </button>
-              </li>
-            ))}
-          </ol>
-          {data.completedAt && <p className="muted small" style={{ margin: '8px 0 0' }}>Finished {shortDate(data.completedAt.slice(0, 10))}</p>}
         </Card>
         <Card title="Next payday">
           <div className="glance-pay"><strong>{shortDate(data.next)}</strong><span className="muted small">{data.daysToNext > 0 ? `in ${data.daysToNext} day${data.daysToNext === 1 ? '' : 's'}` : 'today'} · pays for {monthLabel(addMonthsClient(data.period, 1))}</span></div>

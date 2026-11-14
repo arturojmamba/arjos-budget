@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api.ts';
-import { money, monthLabel, pct, shortDate, amountsHidden } from '../format.ts';
+import { money, monthLabel, pct, shortDate, amountsHidden, niceName } from '../format.ts';
 import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useData, useFitRows, usePaged } from '../components/ui.tsx';
 import { IncomeSpendBars } from '../components/charts.tsx';
 import { LineChart, Spark, StackedBars, Waterfall, useHidden } from '../components/viz.tsx';
@@ -175,7 +175,7 @@ function WeekTab({ week, onWeek }: { week: string | null; onWeek: (w: string | n
               {data.biggest.map((b) => (
                 <li key={b.id} className="clickable" onClick={() => navigate(`/transactions${qs({ from: b.date, to: b.date, month: 'all', merchant: b.merchant })}`)}>
                   <span className="dot" style={{ background: b.colour }} />
-                  <span className="grow"><strong>{b.label}</strong><div className="muted small">{weekday(b.date).slice(0, 3)} {dayMonth(b.date)} · {b.category}</div></span>
+                  <span className="grow"><strong>{niceName(b.label)}</strong><div className="muted small">{weekday(b.date).slice(0, 3)} {dayMonth(b.date)} · {b.category}</div></span>
                   <strong className="num">{money(b.amount)}</strong>
                 </li>
               ))}
@@ -680,7 +680,7 @@ function CashFlow() {
         </Card>
         <Card title="Savings rate">
           <LineChart labels={labels} titles={titles} height={220} format={(n) => `${n.toFixed(0)}%`} axisFormat={(n) => `${n}%`} legend={false}
-            series={[{ key: 'rate', label: 'Saved, as % of money in', colour: '#0ea5e9', values: f.map((x) => (x.savingsRate == null ? null : Math.round(x.savingsRate * 1000) / 10)) }]}
+            series={[{ key: 'rate', label: 'Saved, as % of money in', colour: 'var(--saved)', values: f.map((x) => (x.savingsRate == null ? null : Math.round(x.savingsRate * 1000) / 10)) }]}
             reference={data.savingsRate != null ? { value: Math.round(data.savingsRate * 100), label: `average ${pct(data.savingsRate)}` } : undefined} />
         </Card>
       </div>
@@ -1002,7 +1002,7 @@ function YearReview({ params, onChange }: { params: URLSearchParams; onChange: (
           </ol>
           <p className="field-label" style={{ margin: '14px 0 6px' }}>Biggest single purchases</p>
           <ol className="yr-list">
-            {data.biggest.map((b) => <li key={b.id}><span className="grow">{b.description} <span className="muted small">· {shortDate(b.date)}</span></span><Money value={b.amount} /></li>)}
+            {data.biggest.map((b) => <li key={b.id}><span className="grow">{niceName(b.description)} <span className="muted small">· {shortDate(b.date)}</span></span><Money value={b.amount} /></li>)}
           </ol>
         </Card>
       </div>

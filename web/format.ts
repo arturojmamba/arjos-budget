@@ -118,3 +118,31 @@ export function timeAgo(sqlUtc: string): string {
 export function looksLikeTransfer(name: string): boolean {
   return /\b(debt|repay|repayment|transfer|savings?|pot|isa|credit card|card payment|loan payment)\b/i.test(name);
 }
+
+/**
+ * Bank descriptions often arrive in capitals ("CITY TRANSIT TRAVEL CHARGE"). Show them in normal
+ * case ("City Transit Travel Charge"); the original stays in the data and in the edit form. Text
+ * that already has lower case is left alone. Words with no vowels (TFL, HMRC, DVLA) and one- or
+ * two-letter words (EE, O2, UK) stay in capitals; "LTD", "PLC" and similar read as Ltd, plc.
+ */
+export function niceName(text: string | null | undefined): string {
+  if (!text) return '';
+  if (/[a-z]/.test(text) || !/[A-Z]{3}/.test(text)) return text;
+  const small: Record<string, string> = { LTD: 'Ltd', PLC: 'plc', AND: 'and', OF: 'of', THE: 'the', AT: 'at', ON: 'on', FOR: 'for', TO: 'to', IN: 'in', WWW: 'www', COM: 'com', CO: 'co', UK: 'UK' };
+  return text.replace(/[A-Z0-9][A-Z0-9'&.]*/g, (w, offset: number) => {
+    if (KNOWN_NAMES[w]) return KNOWN_NAMES[w];
+    if (small[w] && (offset > 0 || w === 'UK')) return small[w];
+    if (/\d/.test(w) && /[A-Z]/.test(w) && w.length <= 4) return w;
+    if (w.length <= 2) return w;
+    if (!/[AEIOUY]/.test(w)) return w;
+    return w.charAt(0) + w.slice(1).toLowerCase();
+  });
+}
+
+/** Names and acronyms that normal-casing would get wrong. */
+const KNOWN_NAMES: Record<string, string> = {
+  TFL: 'TfL', PAYE: 'PAYE', DVLA: 'DVLA', ISA: 'ISA', ATM: 'ATM', NHS: 'NHS', BBC: 'BBC', HSBC: 'HSBC', IKEA: 'IKEA', AA: 'AA', RAC: 'RAC',
+  NI: 'NI', VAT: 'VAT', DD: 'DD', SO: 'SO', FX: 'FX', JD: 'JD', TK: 'TK', MAXX: 'Maxx', USA: 'USA', EU: 'EU', GBP: 'GBP', EUR: 'EUR', USD: 'USD',
+  MCDONALDS: "McDonald's", "MCDONALD'S": "McDonald's", PAYPAL: 'PayPal', EBAY: 'eBay', ITUNES: 'iTunes', IPHONE: 'iPhone', YOUTUBE: 'YouTube',
+  LINKEDIN: 'LinkedIn', JUSTEAT: 'Just Eat', UBER: 'Uber', 'B&Q': 'B&Q', 'M&S': 'M&S', 'H&M': 'H&M', 'P&O': 'P&O', 'O2': 'O2', EE: 'EE', CH: 'CH',
+};

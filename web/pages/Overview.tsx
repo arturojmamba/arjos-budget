@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, qs, type Summary, type Plan, type Occurrence, type MonthSpending } from '../api.ts';
-import { money, monthLabel, pct, dayMonth, relativeDay, addMonths, shortDate, privateLabel } from '../format.ts';
-import { Card, Empty, Money, Stat, useApp, useData, Bubble, Progress } from '../components/ui.tsx';
+import { money, monthLabel, pct, dayMonth, relativeDay, addMonths, shortDate, privateLabel, niceName } from '../format.ts';
+import { Badge, Card, Empty, Money, Stat, useApp, useData, Bubble, Progress } from '../components/ui.tsx';
 import { Donut, IncomeSpendBars, Cumulative } from '../components/charts.tsx';
 import { GoalStrip } from './Goals.tsx';
 import { PaydayCard } from './Payday.tsx';
@@ -26,6 +26,8 @@ export function Overview({ month }: { month: string }) {
   const dueSoon = open.filter((o) => o.dueDate <= addDays(meta.today, 30)).slice(0, 6);
   const payday = open.find((o) => o.type === 'income')?.dueDate ?? null;
   const showPlan = plan.billsTotal > 0 || plan.savingsTotal > 0 || plan.debtTotal > 0 || plan.incomeExpected > 0;
+  // This month with a plan: one tile answers "how am I doing?", so the rest needn't repeat it.
+  const heroOn = isCurrent && plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0);
   const showBudgets = !!budgets && budgets.budgets.some((b) => b.kind !== 'saving');
   const showDue = isCurrent && dueSoon.length > 0;
 
@@ -58,19 +60,20 @@ export function Overview({ month }: { month: string }) {
       <PaydayCard />
       <HealthBanner />
 
-      <div className="stats">
+      <div className={`stats ${heroOn ? 'stats-hero' : ''}`}>
+        {heroOn && <FreeHero s={s} plan={plan} payday={payday} today={meta.today} />}
         <Stat label="Income" value={<Money value={s.income} />}
           sub={plan.incomeExpected > s.income ? `${money(plan.incomeExpected - s.income, { compact: true })} still expected`
             : plan.incomeExtra > 0 ? `Incl. ${money(plan.incomeExtra, { compact: true })} above usual pay`
             : s.incomeByCategory.slice(0, 2).map((c) => `${c.name} ${money(c.amount, { compact: true })}`).join(' · ') || 'Nothing yet'} />
         <Stat label="Spent" value={<Money value={s.spending} />} sub={`${money(s.fixed, { compact: true })} fixed · ${money(s.variable, { compact: true })} variable`} />
-        {plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0) ? (
+        {heroOn ? null : plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0) ? (
           <Stat label={privateLabel(plan.freeToSpend >= 0, 'Free to spend', 'Over budget', 'After bills and spending')} value={<Money value={Math.abs(plan.freeToSpend)} />} tone={plan.freeToSpend >= 0 ? 'good' : 'bad'}
             sub={`After ${money(plan.committed, { compact: true })} of bills and savings`} />
         ) : (
           <Stat label={privateLabel(left >= 0, 'Left over', 'Overspent', 'Income minus spending')} value={<Money value={Math.abs(left)} />} tone={left >= 0 ? 'good' : 'bad'} sub={`Savings rate ${pct(s.savingsRate)}`} />
         )}
-        <Stat label="Net worth" value={<Money value={s.netWorth} />} sub={<span>{s.netWorthChange >= 0 ? 'Up' : 'Down'} {money(Math.abs(s.netWorthChange))} on last month</span>} />
+        <Stat label="Net worth" value={<Money value={s.netWorth} />} sub={<span>{s.netWorthChange >= 0 ? 'Up' : 'Down'} {money(Math.abs(s.netWorthChange), { compact: true })} on last month</span>} />
       </div>
 
       {/* Row 1: where the money went | this month's plan */}
@@ -79,7 +82,7 @@ export function Overview({ month }: { month: string }) {
         {showPlan && (
           <Card title={isCurrent ? 'This month' : monthLabel(month)} action={<button className="link-btn" onClick={() => navigate('/bills')}>Bills</button>}>
             <PlanBreakdown plan={plan} />
-            <MonthPace s={s} plan={plan} payday={isCurrent ? payday : null} today={meta.today} catIcon={catIcon} />
+            <MonthPace s={s} plan={plan} payday={isCurrent ? payday : null} today={meta.today} catIcon={catIcon} hero={heroOn} />
           </Card>
         )}
       </div>
@@ -280,8 +283,38 @@ function SpendingByCategory({ s, month }: { s: Summary; month: string }) {
   );
 }
 
+/**
+ * The answer to "how am I doing this month?": what's free to spend, a verdict, and the daily amount
+ * to payday. Over (red) when the plan costs more than this month's pay; "Spending faster" (amber)
+ * when well ahead of last month at the same point; otherwise on track (green).
+ */
+function FreeHero({ s, plan, payday, today }: { s: Summary; plan: Plan; payday: string | null; today: string }) {
+  const p = s.pace;
+  const free = plan.freeToSpend;
+  const daysLeft = payday ? Math.max(1, daysBetween(today, payday)) : Math.max(1, p.daysInMonth - p.day + 1);
+  const perDay = free > 0 ? Math.floor(free / daysLeft) : 0;
+  const ahead = p.isCurrent && p.lastMonthToDate > 0 ? p.spentToDate - p.lastMonthToDate : 0;
+  const fast = ahead > Math.max(2500, p.lastMonthToDate * 0.1);
+  const verdict = free < 0 ? { tone: 'bad' as const, label: 'Over' } : fast ? { tone: 'warn' as const, label: 'Spending faster than last month' } : { tone: 'good' as const, label: 'On track' };
+  const until = payday ? `until payday` : `left this month`;
+  return (
+    <div className="stat stat-hero">
+      <div className="stat-hero-top">
+        <p className="stat-label">{free >= 0 ? 'Free to spend' : 'Over this month'}</p>
+        <Badge tone={verdict.tone}>{verdict.label}</Badge>
+      </div>
+      <p className={`stat-value ${free < 0 ? 'tone-bad' : ''}`}><Money value={Math.abs(free)} /></p>
+      <p className="stat-sub">
+        {free < 0
+          ? <>Bills, savings and spending come to more than this month's pay. Spend less or move a saving.</>
+          : <><Money value={perDay} /> a day for {daysLeft} day{daysLeft === 1 ? '' : 's'} {until}{ahead !== 0 && Math.abs(ahead) >= 100 ? <>, <Money value={Math.abs(ahead)} /> {ahead > 0 ? 'more' : 'less'} spent than by this point last month</> : null}.</>}
+      </p>
+    </div>
+  );
+}
+
 /** How the month is going: pace against last month, a daily allowance until payday, and the biggest purchases. */
-function MonthPace({ s, plan, payday, today, catIcon }: { s: Summary; plan: Plan; payday: string | null; today: string; catIcon: (id: number | null) => string }) {
+function MonthPace({ s, plan, payday, today, catIcon, hero }: { s: Summary; plan: Plan; payday: string | null; today: string; catIcon: (id: number | null) => string; hero?: boolean }) {
   const { categories } = useApp();
   const p = s.pace;
   const diff = p.spentToDate - p.lastMonthToDate;
@@ -290,7 +323,7 @@ function MonthPace({ s, plan, payday, today, catIcon }: { s: Summary; plan: Plan
   const hasPlan = plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0);
   return (
     <div className="pace">
-      <div className="pace-tiles">
+      {!hero && <div className="pace-tiles">
         <div className="pace-tile">
           <span className="muted small">{p.isCurrent ? `Spent by day ${p.day}` : 'Spent this month'}</span>
           <Money value={p.spentToDate} className="strong" />
@@ -313,7 +346,7 @@ function MonthPace({ s, plan, payday, today, catIcon }: { s: Summary; plan: Plan
             <span className="muted small">over {p.day} day{p.day === 1 ? '' : 's'}</span>
           </div>
         )}
-      </div>
+      </div>}
       {s.topSpends.length > 0 && (
         <div className="pace-top">
           <span className="muted small strong-label">Biggest spends</span>
@@ -323,7 +356,7 @@ function MonthPace({ s, plan, payday, today, catIcon }: { s: Summary; plan: Plan
               return (
                 <li key={t.id}>
                   <Bubble colour={c?.colour ?? '#94a3b8'} icon={catIcon(t.categoryId)} size={26} />
-                  <span className="grow ellipsis">{t.description}<span className="muted small"> · {shortDate(t.date)}</span></span>
+                  <span className="grow ellipsis">{niceName(t.description)}<span className="muted small"> · {shortDate(t.date)}</span></span>
                   <Money value={t.amount} />
                 </li>
               );

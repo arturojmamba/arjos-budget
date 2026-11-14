@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api, qs, type Transaction } from '../api.ts';
-import { amountsHidden, dayLabel, money, monthLabel, shortDate } from '../format.ts';
+import { amountsHidden, dayLabel, money, monthLabel, shortDate, niceName } from '../format.ts';
 import { AccountSelect, Bubble, CategorySelect, Empty, Money, amountClass, useApp, useConfirm, Badge, Progress } from '../components/ui.tsx';
 import { TransactionForm } from '../components/TransactionForm.tsx';
 import { Icon } from '../components/Icon.tsx';
@@ -138,14 +138,6 @@ export function Transactions({ params }: { params: URLSearchParams }) {
           <option value="saving">Savings</option>
           <option value="transfer">Transfers</option>
         </select>
-        <label className="chip-toggle">
-          <input type="checkbox" checked={f.uncategorised} onChange={(e) => update({ uncategorised: e.target.checked, categoryId: null })} />
-          Needs category
-        </label>
-        <span className="spacer" />
-        <a className="btn" href={`/api/export/transactions.csv${qs({ month: monthQ, accountId: f.accountId, categoryId: f.categoryId, search: f.search })}`}>
-          <Icon name="download" size={16} /> Export
-        </a>
       </div>
 
       <div className="list-summary">
@@ -153,8 +145,10 @@ export function Transactions({ params }: { params: URLSearchParams }) {
           <input type="checkbox" checked={allOnPageSelected} onChange={() => setSelected(allOnPageSelected ? new Set() : new Set(items.map((t) => t.id)))} disabled={items.length === 0} />
         </label>
         <span>{total.toLocaleString('en-GB')} transaction{total === 1 ? '' : 's'}{f.merchant ? ` at ${f.merchant}` : ''}{catName ? ` in ${catName}` : ''}{budgetName ? ` in your ${budgetName} budget` : ''}{f.from && f.to ? ` from ${shortDate(f.from)} to ${shortDate(f.to)}` : ''}</span>
-        <span className="muted">In <Money value={totals.in} className="amt-in" /></span>
-        <span className="muted">Out <Money value={totals.out} /></span>
+        <label className="chip-toggle">
+          <input type="checkbox" checked={f.uncategorised} onChange={(e) => update({ uncategorised: e.target.checked, categoryId: null })} />
+          Needs category
+        </label>
         {f.search && monthQ && <button className="link-btn" onClick={() => update({ month: 'all' })}>Search all months</button>}
         {f.merchant && <button className="link-btn" onClick={() => update({ merchant: '' })}>All places</button>}
         {filtered && <button className="link-btn" onClick={() => setParams('/transactions', {})}>Clear filters</button>}
@@ -165,6 +159,9 @@ export function Transactions({ params }: { params: URLSearchParams }) {
           </select>
           per page
         </label>
+        <a className="btn btn-sm" href={`/api/export/transactions.csv${qs({ month: monthQ, accountId: f.accountId, categoryId: f.categoryId, search: f.search })}`}>
+          <Icon name="download" size={14} /> Export
+        </a>
       </div>
 
       <div className="cols-main-side">
@@ -196,8 +193,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
                 <h2 className="month-head">
                   <span>{monthLabel(m.month)}{partial && <span className="muted small"> · showing {m.shown} of {mt!.count}</span>}</span>
                   {mt && (
-                    <span className="month-head-totals">
-                      <span className="muted small">{mt.count} transaction{mt.count === 1 ? '' : 's'}</span>
+                    <span className={`month-head-totals ${months.length === 1 ? 'single' : ''}`}>
                       {mt.in > 0 && <span className="small">In <Money value={mt.in} className="amt-in" /></span>}
                       <span className="small">Spent <Money value={mt.out} /></span>
                       {mt.saved !== 0 && <span className="small">Saved <Money value={mt.saved} className="amt-saved" /></span>}
@@ -316,7 +312,7 @@ export function TxnRow({ t, accountId, onClick, selectable, selected, onSelect, 
       <button className="txn-main" onClick={onClick} disabled={!onClick}>
         {bubble}
         <span className="txn-text">
-          <span className="txn-desc">{t.description}{t.notes && <Icon name="edit" size={12} className="muted" />}</span>
+          <span className="txn-desc" title={t.description}>{niceName(t.description)}{t.notes && <Icon name="edit" size={12} className="muted" />}</span>
           <span className="txn-sub">
             {showDate && <>{shortDate(t.date)}<span className="sep">·</span></>}
             {isRepayment ? <>Debt repayment<span className="sep">·</span></>
