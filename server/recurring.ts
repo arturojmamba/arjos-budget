@@ -431,7 +431,7 @@ export function occurrences(db: DB, from: string, to: string): Occurrence[] {
 export function listRecurring(db: DB) {
   const today = todayIso();
   const rows = db.prepare(
-    `SELECT r.*, a.name AS account_name, ta.name AS transfer_account_name, c.name AS category_name, c.colour AS category_colour, c.icon AS category_icon
+    `SELECT r.*, a.name AS account_name, ta.name AS transfer_account_name, ta.type AS transfer_account_type, c.name AS category_name, c.colour AS category_colour, c.icon AS category_icon
      FROM recurring r JOIN accounts a ON a.id = r.account_id
      LEFT JOIN accounts ta ON ta.id = r.transfer_account_id LEFT JOIN categories c ON c.id = r.category_id
      ORDER BY r.active DESC, r.type, r.name`,
@@ -464,6 +464,7 @@ export function listRecurring(db: DB) {
       accountName: r.account_name,
       transferAccountId: r.transfer_account_id,
       transferAccountName: r.transfer_account_name,
+      isDebt: r.type === 'saving' && !!r.transfer_account_type && isLiability(r.transfer_account_type),
       categoryId: r.category_id,
       categoryName: r.category_name,
       categoryColour: r.category_colour,
@@ -488,88 +489,6 @@ export function listRecurring(db: DB) {
   });
 }
 
-/**
- * The month at a glance: what's coming in, what's already committed to bills
- * and savings, and what's genuinely free to spend.
- */
-export function monthPlan(db: DB, month: string) {
-  const first = `${month}-01`;
-  const last = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
-  // Income is looked up by the month it counts towards, so include the end of the previous month.
-  const occ = occurrences(db, addDays(first, -10), last);
-  const inMonth = occ.filter((o) => o.type !== 'income' && o.dueDate >= first);
-  const income = occ.filter((o) => o.type === 'income' && o.period === month);
-
-  const amountOf = (o: Occurrence) => (o.status === 'paid' && o.paidAmount != null ? o.paidAmount : o.status === 'skipped' ? 0 : o.expected);
-  const sum = (list: Occurrence[], f: (o: Occurrence) => number) => list.reduce((s, o) => s + f(o), 0);
-
-  const bills = inMonth.filter((o) => o.type === 'bill' || o.type === 'subscription');
-  const savings = inMonth.filter((o) => o.type === 'saving' && !o.isDebt);
-  const debts = inMonth.filter((o) => o.isDebt);
-  const debtTotal = sum(debts, amountOf);
-  const debtDone = sum(debts.filter((o) => o.status === 'paid'), amountOf);
-  const billsTotal = sum(bills, amountOf);
-  const billsPaid = sum(bills.filter((o) => o.status === 'paid'), amountOf);
-  const savingsTotal = sum(savings, amountOf);
-  const savingsDone = sum(savings.filter((o) => o.status === 'paid'), amountOf);
-  const incomeExpected = sum(income, amountOf);
-  const incomeReceived = sum(income.filter((o) => o.status === 'paid'), amountOf);
-
-  // Spending this month that wasn't a planned bill (groceries, eating out…).
-  const { spending, income: actualIncome } = monthTotals(db, month);
-  const billSpending = (db.prepare(
-    `SELECT IFNULL(SUM(-p.amount), 0) AS n FROM recurring_payments rp
-     JOIN recurring r ON r.id = rp.recurring_id
-     JOIN transactions t ON t.id = rp.transaction_id
-     JOIN postings p ON p.transaction_id = t.id
-     WHERE r.type IN ('bill','subscription') AND t.kind = 'expense' AND t.period = ?`,
-  ).get(month) as { n: number }).n;
-  const otherSpending = spending - billSpending;
-  // Income that arrived but wasn't planned (a refund from HMRC, a bonus…) still counts.
-  const unplannedIncome = Math.max(0, actualIncome - incomeReceived);
-  const totalIncome = incomeExpected + unplannedIncome;
-  // Money above your usual pay this month: payments bigger than expected, plus anything categorised as a bonus
-  // that isn't already a planned item. (Other unplanned income, e.g. a salary month you don't track, isn't "extra".)
-  const aboveUsual = income.filter((o) => o.status === 'paid' && o.paidAmount != null).reduce((s, o) => s + Math.max(0, o.paidAmount! - o.expected), 0);
-  const bonusUnplanned = (db.prepare(
-    `SELECT IFNULL(SUM(p.amount), 0) AS n FROM postings p JOIN transactions t ON t.id = p.transaction_id
-     JOIN categories c ON c.id = p.category_id LEFT JOIN categories top ON top.id = IFNULL(c.parent_id, c.id)
-     WHERE t.kind = 'income' AND t.period = ? AND top.name = 'Bonuses'
-       AND NOT EXISTS (SELECT 1 FROM recurring_payments rp WHERE rp.transaction_id = t.id)`,
-  ).get(month) as { n: number }).n;
-  const incomeExtra = aboveUsual + Math.max(0, bonusUnplanned);
-
-  const monthlyRows = (db.prepare(
-    `SELECT r.type, r.amount - IFNULL((SELECT SUM(s.amount) FROM recurring_shares s WHERE s.recurring_id = r.id), 0) AS amount,
-            r.frequency, ta.type AS transfer_type FROM recurring r LEFT JOIN accounts ta ON ta.id = r.transfer_account_id
-     WHERE r.active = 1 AND NOT (r.frequency = 'annually' AND IFNULL(r.end_date, '') = r.start_date)`,
-  ).all() as { type: RecurringType; amount: number; frequency: Frequency; transfer_type: string | null }[])
-    .map((r) => ({ ...r, isDebt: r.type === 'saving' && !!r.transfer_type && isLiability(r.transfer_type) }));
-  const monthly = { bills: 0, subscriptions: 0, savings: 0, debts: 0, income: 0 };
-  for (const r of monthlyRows) {
-    const key = r.type === 'bill' ? 'bills' : r.type === 'subscription' ? 'subscriptions' : r.type === 'saving' ? (r.isDebt ? 'debts' : 'savings') : 'income';
-    monthly[key] += monthlyEquivalent(r.amount, r.frequency);
-  }
-
-  return {
-    month,
-    incomeExpected: totalIncome,
-    incomeReceived: incomeReceived + unplannedIncome,
-    incomeExtra,
-    billsTotal,
-    billsPaid,
-    billsRemaining: billsTotal - billsPaid,
-    savingsTotal,
-    savingsDone,
-    debtTotal,
-    debtDone,
-    committed: billsTotal + savingsTotal + debtTotal,
-    committedShare: totalIncome > 0 ? (billsTotal + savingsTotal + debtTotal) / totalIncome : null,
-    otherSpending,
-    freeToSpend: totalIncome - billsTotal - savingsTotal - debtTotal - otherSpending,
-    monthly,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Suggestions: spot regular payments in your history

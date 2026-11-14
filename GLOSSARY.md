@@ -37,3 +37,21 @@ _Avoid_: Cycle on its own, pay period
 **Funded month**:
 The month a payday pays for. Pay that lands in the last few days of a month (Settings → Budgeting, 5 by default) funds the next month; otherwise it funds the month it lands in.
 _Avoid_: Period (in the code this is the funded month), budget month
+
+## Plan
+
+**Plan**:
+What a funded month's money is committed to: bills and subscriptions, savings and debt repayments, with what's done and what's left of each. Every screen reads the same Plan for the same month.
+_Avoid_: Budget (budgets are limits on everyday spending), schedule
+
+**Committed**:
+Bills and subscriptions plus savings plus debt repayments in a Plan, counting only your share of shared bills.
+_Avoid_: Fixed costs (that's a category marking), outgoings
+
+**Free to spend**:
+What's left of a month's income after what's committed and what's already been spent day to day.
+_Avoid_: Left over, disposable income, buffer
+
+**Buffer**:
+What's left of your pay after the Payday plan gives every pound a job: committed money plus budgets.
+_Avoid_: Free to spend (that's after actual spending, not budgets), spare

@@ -11,10 +11,11 @@
  * Pay on the last working day funds the next month (the "period"), as everywhere else in the app.
  */
 import { type DB, tx } from './db.ts';
-import { ValidationError, assertPence } from './money.ts';
+import { ValidationError, assertPence, perMonth } from './money.ts';
 import { addDays, addMonths, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
 import { yourPay, paydayIn, paydayOnOrBefore, payCycle, cycleFrom, fundedMonth } from './paycycle.ts';
-import { occurrences, listRecurring } from './recurring.ts';
+import { listRecurring } from './recurring.ts';
+import { plan as planFor, movedInto } from './plan.ts';
 import { listBudgets } from './budgets.ts';
 import { listGoals } from './goals.ts';
 import { listDebts } from './debts.ts';
@@ -40,13 +41,6 @@ export function setCheck(db: DB, cycle: string, key: string, done: boolean) {
   else db.prepare('DELETE FROM payday_checks WHERE cycle = ? AND key = ?').run(cycle, key);
 }
 
-/** Money moved into an account (from any other account) between two dates. */
-function movedInto(db: DB, accountId: number, from: string, to: string) {
-  return db.prepare(
-    `SELECT IFNULL(SUM(p.amount), 0) AS amount, MAX(t.date) AS last FROM postings p JOIN transactions t ON t.id = p.transaction_id
-     WHERE p.account_id = ? AND t.kind = 'transfer' AND p.amount > 0 AND t.date BETWEEN ? AND ?`,
-  ).get(accountId, from, to) as { amount: number; last: string | null };
-}
 
 export function payday(db: DB, cycleIn?: string | null, today = todayIso()) {
   const s = yourPay(db);
@@ -102,40 +96,14 @@ export function payday(db: DB, cycleIn?: string | null, today = todayIso()) {
     if (missing.length) looseEnds.push({ title: `${r.name}: ${missing.length} of ${r.shares.length} haven't paid you back`, detail: `${missing.join(', ')} for ${c.dueDate}. Their payments may just not be imported yet.`, link: '/bills', linkLabel: 'Open Bills' });
   }
 
-  // 3. Plan: what this pay has to cover before the next one.
-  const occ = occurrences(db, cycle, windowEnd);
-  const recurringRows = new Map((db.prepare(
-    `SELECT r.id, r.category_id, r.transfer_account_id, ta.name AS transfer_name, a.name AS from_name, IFNULL((SELECT SUM(s.amount) FROM recurring_shares s WHERE s.recurring_id = r.id), 0) AS shared
-     FROM recurring r JOIN accounts a ON a.id = r.account_id LEFT JOIN accounts ta ON ta.id = r.transfer_account_id`,
-  ).all() as { id: number; category_id: number | null; transfer_account_id: number | null; transfer_name: string | null; from_name: string; shared: number }[]).map((r) => [r.id, r]));
+  // 3. Plan: the funded month's Plan (the same one Overview and Bills show), with budgets on top.
+  const monthPlanned = planFor(db, period, today);
   const budgetsNext = listBudgets(db, period, today).budgets.filter((b: any) => b.kind === 'spending');
-  const budgetCats = new Map<number, string>();
-  for (const b of budgetsNext as any[]) {
-    const ids = db.prepare(
-      'SELECT DISTINCT c.id FROM budget_categories bc JOIN categories c ON c.id = bc.category_id OR c.parent_id = bc.category_id WHERE bc.budget_id = ?',
-    ).all(b.id) as { id: number }[];
-    for (const { id } of ids) if (!budgetCats.has(id)) budgetCats.set(id, b.name);
-  }
-  const amountOf = (o: (typeof occ)[number]) => {
-    const shared = recurringRows.get(o.recurringId)?.shared ?? 0;
-    return Math.max(0, (o.status === 'paid' && o.paidAmount != null ? o.paidAmount : o.expected) - shared);
-  };
-  const billItems = occ.filter((o) => (o.type === 'bill' || o.type === 'subscription') && o.status !== 'skipped').map((o) => {
-    const cat = recurringRows.get(o.recurringId)?.category_id;
-    return { recurringId: o.recurringId, name: o.name, date: o.dueDate, amount: amountOf(o), paid: o.status === 'paid', coveredBy: cat != null ? budgetCats.get(cat) ?? null : null };
-  });
-  const debtItems = occ.filter((o) => o.isDebt && o.status !== 'skipped').map((o) => ({ recurringId: o.recurringId, name: o.name, date: o.dueDate, amount: amountOf(o), paid: o.status === 'paid', accountId: recurringRows.get(o.recurringId)?.transfer_account_id ?? null, to: recurringRows.get(o.recurringId)?.transfer_name ?? '', from: recurringRows.get(o.recurringId)?.from_name ?? '' }));
-  const savingOcc = occ.filter((o) => o.type === 'saving' && !o.isDebt && o.status !== 'skipped');
-  const goals = (listGoals(db, today) as any).goals?.filter((g: any) => !g.archived && !g.completedAt && g.monthlyTarget) ?? [];
-  const goalAccounts = new Set(goals.map((g: any) => g.account?.id));
-  const savingItems = [
-    ...goals.map((g: any) => ({ key: `goal:${g.id}`, name: g.name, icon: g.icon, amount: g.monthlyTarget as number, accountId: g.account?.id as number, accountName: g.account?.name as string })),
-    ...savingOcc.filter((o) => !goalAccounts.has(recurringRows.get(o.recurringId)?.transfer_account_id ?? -1))
-      .map((o) => ({ key: `saving:${o.recurringId}`, name: o.name, icon: null, amount: amountOf(o), accountId: recurringRows.get(o.recurringId)?.transfer_account_id as number, accountName: o.accountName })),
-  ];
-  // Weekly and annual budgets as a month's worth, so they add up with everything else.
-  const perMonth = (b: any) => (b.period === 'weekly' ? Math.round((b.limit * daysInMonth(period)) / 7) : b.period === 'annual' ? Math.round(b.limit / 12) : b.limit);
-  const budgetItems = (budgetsNext as any[]).map((b) => ({ id: b.id, name: b.name, icon: b.icon, colour: b.colour, limit: perMonth(b), setLimit: b.limit, period: b.period }));
+  const billItems = monthPlanned.bills.items.map((b) => ({ recurringId: b.recurringId!, name: b.name, date: b.date!, amount: b.amount, paid: b.paid, coveredBy: b.coveredBy }));
+  const debtItems = monthPlanned.debts.items.map((d) => ({ recurringId: d.recurringId!, name: d.name, date: d.date!, amount: d.amount, paid: d.paid, accountId: d.accountId, to: d.to ?? '', from: d.from ?? '' }));
+  const savingItems = monthPlanned.savings.items.map((v) => ({ key: v.goalId != null ? `goal:${v.goalId}` : `saving:${v.recurringId}`, name: v.name, icon: v.goalId != null ? v.icon : null, amount: v.amount, accountId: v.accountId as number, accountName: v.accountName as string }));
+  // Weekly and yearly budgets as a month's worth, so they add up with everything else.
+  const budgetItems = (budgetsNext as any[]).map((b) => ({ id: b.id, name: b.name, icon: b.icon, colour: b.colour, limit: perMonth(b.limit, b.period), setLimit: b.limit, period: b.period }));
   const sum = (xs: { amount?: number; limit?: number }[], k: 'amount' | 'limit' = 'amount') => xs.reduce((n, x) => n + ((x as any)[k] ?? 0), 0);
   const billsCounted = billItems.filter((b) => !b.coveredBy);
   const plan = {

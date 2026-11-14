@@ -89,7 +89,7 @@ export type OccurrenceStatus = 'paid' | 'skipped' | 'upcoming' | 'due' | 'overdu
 export interface Recurring {
   id: number; name: string; type: RecurringType; amount: number; variable: boolean; frequency: Frequency; startDate: string;
   schedule: 'fixed' | 'last_working_day'; endDate: string | null; accountId: number; accountName: string;
-  transferAccountId: number | null; transferAccountName: string | null; categoryId: number | null; categoryName: string | null;
+  transferAccountId: number | null; transferAccountName: string | null; isDebt: boolean; categoryId: number | null; categoryName: string | null;
   categoryColour: string | null; categoryIcon: string | null; matchPattern: string | null; notes: string | null; active: boolean;
   monthly: number; next: { dueDate: string; status: OccurrenceStatus; expected: number } | null;
   history: { dueDate: string; status: 'paid' | 'skipped'; amount: number | null; paidDate: string | null; transactionId: number | null; description: string | null }[];

@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testDb } from './fixtures.ts';
+import { monthPlan } from '../server/plan.ts';
 import { createTransaction, simpleToPostings, deleteTransaction } from '../server/ledger.ts';
 import { lastWorkingDay, bankHolidays, isWorkingDay } from '../server/calendar.ts';
-import { createRecurring, dueDates, monthlyEquivalent, listRecurring, monthPlan, setPayment, suggestRecurring, dismissSuggestion, autoMatch, occurrences } from '../server/recurring.ts';
+import { createRecurring, dueDates, monthlyEquivalent, listRecurring, setPayment, suggestRecurring, dismissSuggestion, autoMatch, occurrences } from '../server/recurring.ts';
 import { addDays, todayIso, monthOf } from '../server/dates.ts';
 
 function setup() {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { testDb } from './fixtures.ts';
 import { createTransaction, simpleToPostings } from '../server/ledger.ts';
 import { simulate, minimumDue, monthlyInterest, upsertDebt, createDebt, listDebts, debtPlan, addRepaymentToBills, linkCandidates, linkToDebt, uncountedRepayments, reviewRepayments, debtTimeline, archiveDebt, type SimDebt } from '../server/debts.ts';
-import { monthPlan } from '../server/recurring.ts';
+import { monthPlan } from '../server/plan.ts';
 import { monthTotals } from '../server/queries.ts';
 import { updateAccount } from '../server/admin.ts';
 

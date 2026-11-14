@@ -5,6 +5,7 @@ import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useD
 import { IncomeSpendBars } from '../components/charts.tsx';
 import { LineChart, Spark, StackedBars, Waterfall, useHidden } from '../components/viz.tsx';
 import { Icon, CatGlyph } from '../components/Icon.tsx';
+import { SERIES } from '../series.ts';
 import { navigate, setParams } from '../router.ts';
 
 type Tab = 'week' | 'spending' | 'cashflow' | 'compare' | 'networth' | 'year';
@@ -667,15 +668,15 @@ function CashFlow() {
           series={[
             { key: 'income', label: 'Money in', colour: 'var(--income)', values: f.map((x) => x.income) },
             { key: 'spending', label: 'Spending', colour: 'var(--spend)', values: f.map((x) => x.spending) },
-            { key: 'saved', label: 'Saved and invested', colour: '#0ea5e9', values: f.map((x) => x.saved) },
+            { key: 'saved', label: 'Saved and invested', colour: SERIES.savings.colour, values: f.map((x) => x.saved) },
           ]} />
       </Card>
       <div className="grid-2-cards">
         <Card title="Fixed and flexible spending">
           <StackedBars labels={labels} titles={titles} height={220}
             series={[
-              { key: 'fixed', label: 'Fixed: rent, bills, subscriptions, loans', colour: '#eab308', values: f.map((x) => x.fixed) },
-              { key: 'flexible', label: 'Flexible: everything else', colour: 'var(--spend)', values: f.map((x) => x.flexible) },
+              { key: 'fixed', label: 'Fixed: rent, bills, subscriptions, loans', colour: SERIES.bills.colour, values: f.map((x) => x.fixed) },
+              { key: 'flexible', label: 'Flexible: everything else', colour: SERIES.spending.colour, values: f.map((x) => x.flexible) },
             ]}
             reference={{ value: data.averages.spending, label: `average ${money(data.averages.spending)}` }} />
         </Card>
@@ -863,11 +864,11 @@ interface NWPoint { month: string; cash: number; savings: number; investments: n
 interface NWData { points: NWPoint[]; changes: { month: string; change: number; saved: number; growth: number; debtPaid: number }[]; milestones: { month: string; label: string }[]; high: { month: string; value: number } | null }
 
 const NW_GROUPS: { key: keyof NWPoint; label: string; colour: string }[] = [
-  { key: 'cash', label: 'Current accounts', colour: '#64748b' },
-  { key: 'savings', label: 'Savings and pots', colour: '#0ea5e9' },
-  { key: 'investments', label: 'Investments', colour: '#8b5cf6' },
-  { key: 'cards', label: 'Credit cards', colour: '#f97316' },
-  { key: 'loans', label: 'Loans and other debts', colour: '#ec4899' },
+  { key: 'cash', label: 'Current accounts', colour: 'var(--spend)' },
+  { key: 'savings', label: 'Savings and pots', colour: 'var(--saved)' },
+  { key: 'investments', label: 'Investments', colour: 'var(--nw-investments)' },
+  { key: 'cards', label: 'Credit cards', colour: 'var(--nw-cards)' },
+  { key: 'loans', label: 'Loans and other debts', colour: 'var(--nw-loans)' },
 ];
 
 function NetWorth() {

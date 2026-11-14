@@ -85,6 +85,8 @@ Coil is a personal finance app used at a desk once or twice a week: import state
 - **A category's own colour**: only to identify that category (dots, share bars, chart series).
 - **Neutral** (text colours, `--spend` slate): everything that isn't a judgement, such as a mid-month net, a change in net worth, spending as a series.
 
+**Plan series have one colour each** (web/series.ts): Bills `--bills`, Subscriptions `--subscriptions`, Savings `--saved`, Debt repayments `--bad`, Everyday spending and budgets `--spend`, Income `--income`. Pages never write a hex colour for a series; `tests/design.test.ts` checks.
+
 **Status text uses the -text variants.** The fills (good, warn, bad, info) are for bars, dots and charts; text in those meanings uses `--good-text` and friends, which pass 4.5:1 in light mode. In dark mode both are the same.
 
 - **Red is for debt you're carrying.** A credit card paid in full each month is spending, not debt: its balance history is neutral (`--spend`), never red.

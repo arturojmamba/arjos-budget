@@ -71,3 +71,8 @@ export function assertPence(value: unknown, field = 'amount'): Pence {
 export class ValidationError extends Error {
   status = 400;
 }
+
+/** A weekly or yearly amount as a month's worth: weekly × 52 ÷ 12, yearly ÷ 12 (see GLOSSARY.md: Plan). */
+export function perMonth(amount: number, period: 'weekly' | 'monthly' | 'annual' | string): number {
+  return period === 'weekly' ? Math.round((amount * 52) / 12) : period === 'annual' ? Math.round(amount / 12) : amount;
+}

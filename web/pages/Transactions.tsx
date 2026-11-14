@@ -303,7 +303,7 @@ export function TxnRow({ t, accountId, onClick, selectable, selected, onSelect, 
   }
   const isRepayment = t.kind === 'transfer' && t.postings.some((p) => p.amount > 0 && p.accountIsLiability);
   const saving = savingDirection(t);
-  if (saving) bubble = <Bubble colour="#0ea5e9" icon={saving === 'in' ? '🐷' : '↩️'} />;
+  if (saving) bubble = <Bubble colour="var(--saved)" icon={saving === 'in' ? '🐷' : '↩️'} />;
   return (
     <li className={`txn ${selected ? 'is-selected' : ''}`}>
       {selectable && (

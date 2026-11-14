@@ -108,7 +108,7 @@ test('weekly budgets and the month summary', () => {
   const lunches = r.budgets.find((b) => b.name === 'Lunches')!;
   assert.equal(lunches.spent, 900, 'only this week');
   assert.equal(lunches.current.label, '9 Nov – 15 Nov');
-  assert.equal(r.summary.total, 25000 + Math.round((3500 * 30) / 7));
+  assert.equal(r.summary.total, 25000 + Math.round((3500 * 52) / 12), 'a weekly budget as a month: × 52 ÷ 12');
   assert.equal(r.summary.spent, 8000 + 2100);
   assert.equal(r.summary.unbudgeted, 3000);
   assert.equal(r.summary.unbudgetedCategories[0].name, 'Shopping');

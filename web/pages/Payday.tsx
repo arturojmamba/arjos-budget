@@ -5,6 +5,7 @@ import { money, monthLabel, parseAmount, pct, penceToInput, shortDate, niceName 
 import { Badge, Card, Money, Progress, useApp, useConfirm, useData } from '../components/ui.tsx';
 import { Icon, CatGlyph } from '../components/Icon.tsx';
 import { navigate, setParams } from '../router.ts';
+import { SERIES } from '../series.ts';
 
 interface Move { key: string; kind: 'goal' | 'saving' | 'debt' | 'card'; title: string; to: string; amount: number; due: string | null; status: 'done' | 'partial' | 'waiting' | 'skipped'; moved: number; movedOn: string | null; note: string | null }
 interface PaydayData {
@@ -27,11 +28,11 @@ interface PaydayData {
 interface Log { cycle: string; period: string; completedAt: string; inProgress: boolean; planned: { pay: number; plan: { bills: number; debts: number; savings: number; budgets: number; buffer: number } }; actual: { income: number; spending: number; saved: number; left: number } }
 
 const SPLIT = [
-  // The same colours as Overview's This month: bills gold, debts red, savings blue, spending slate.
-  { key: 'bills', label: 'Bills', colour: '#eab308' },
-  { key: 'debts', label: 'Debt payments', colour: 'var(--bad)' },
-  { key: 'savings', label: 'Savings', colour: 'var(--saved)' },
-  { key: 'budgets', label: 'Budgets', colour: 'var(--spend)' },
+  // The Plan's series colours (web/series.ts), the same as Overview's This month.
+  { key: 'bills', label: 'Bills', colour: SERIES.bills.colour },
+  { key: 'debts', label: 'Debt payments', colour: SERIES.debts.colour },
+  { key: 'savings', label: 'Savings', colour: SERIES.savings.colour },
+  { key: 'budgets', label: 'Budgets', colour: SERIES.spending.colour },
 ] as const;
 
 export function Payday({ params }: { params: URLSearchParams }) {
@@ -341,7 +342,7 @@ function BudgetEditor({ data, leftForBudgets, onSaved, done, onUndo }: { data: P
   const { toast } = useApp();
   const [vals, setVals] = useState<Record<number, string>>({});
   useEffect(() => { setVals(Object.fromEntries(data.budgets.map((b) => [b.id, penceToInput(b.setLimit)]))); }, [data.cycle, data.budgets.map((b) => b.setLimit).join()]); // eslint-disable-line
-  const perMonth = (b: PaydayData['budgets'][number], v: number) => (b.period === 'weekly' ? Math.round((v * 30.4) / 7) : b.period === 'annual' ? Math.round(v / 12) : v);
+  const perMonth = (b: PaydayData['budgets'][number], v: number) => (b.period === 'weekly' ? Math.round((v * 52) / 12) : b.period === 'annual' ? Math.round(v / 12) : v);
   const total = data.budgets.reduce((n, b) => n + perMonth(b, parseAmount(vals[b.id] ?? '') ?? b.setLimit), 0);
   const changed = data.budgets.filter((b) => (parseAmount(vals[b.id] ?? '') ?? b.setLimit) !== b.setLimit);
   async function save() {

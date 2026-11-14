@@ -15,3 +15,17 @@ test('nothing scrolls vertically inside a card (lists page instead)', () => {
   }
   assert.deepEqual(offenders, [], `These scroll vertically; make the list fit and page instead (usePaged / useFitRows): ${offenders.join(', ')}`);
 });
+
+// DESIGN.md › Colors and web/series.ts: the Plan's series colours are tokens, never hex in a page.
+const PLAN_PAGES = ['Bills', 'Payday', 'Overview', 'Reports', 'Budgets', 'Debts', 'Goals', 'Transactions'];
+
+test('pages take plan and status colours from tokens, not hex', () => {
+  const offenders: string[] = [];
+  for (const page of PLAN_PAGES) {
+    const src = readFileSync(new URL(`../web/pages/${page}.tsx`, import.meta.url), 'utf8');
+    src.split('\n').forEach((line, i) => {
+      if (/(colour|background|color)\s*[:=]\s*['"`]#[0-9a-f]{3,8}/i.test(line)) offenders.push(`${page}.tsx:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], `Use SERIES (web/series.ts) or a CSS token instead of hex: ${offenders.join(', ')}`);
+});

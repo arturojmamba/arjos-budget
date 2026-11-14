@@ -4,13 +4,14 @@ import { amountsHidden as amountsHiddenNow } from '../format.ts';
 import { FREQUENCY_LABELS, privateLabel, addMonths, dayMonth, money, monthLabel, pct, relativeDay, shortDate } from '../format.ts';
 import { Badge, Bubble, Card, Empty, Modal, Money, Stat, useApp, useData, useFitRows, usePaged, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
+import { SERIES } from '../series.ts';
 import { RecurringForm, type RecurringDraft } from '../components/RecurringForm.tsx';
 
 const TYPE_ICON: Record<string, string> = { bill: 'bolt', subscription: 'repeat', saving: 'piggy-bank', income: 'briefcase' };
-const TYPE_COLOUR: Record<string, string> = { bill: '#eab308', subscription: '#6366f1', saving: 'var(--saved)', income: 'var(--income)' };
+const TYPE_COLOUR: Record<string, string> = { bill: SERIES.bills.colour, subscription: SERIES.subscriptions.colour, saving: SERIES.savings.colour, income: SERIES.income.colour };
 /** Debt repayments are 'saving' transfers to a card or loan: show them as debt, not savings. */
 const occIcon = (o: { type: string; isDebt?: boolean }) => (o.isDebt ? 'percentage' : TYPE_ICON[o.type]);
-const occColour = (o: { type: string; isDebt?: boolean }) => (o.isDebt ? 'var(--bad)' : TYPE_COLOUR[o.type]);
+const occColour = (o: { type: string; isDebt?: boolean }) => (o.isDebt ? SERIES.debts.colour : TYPE_COLOUR[o.type]);
 
 export function Bills() {
   const { meta, categories } = useApp();
@@ -28,9 +29,11 @@ export function Bills() {
   const upcoming = monthItems.filter((o) => (day ? o.dueDate === day : o.dueDate >= meta.today || o.status === 'overdue' || o.status === 'due'));
   const leftOut = monthItems.filter((o) => o.type !== 'income' && o.dueDate >= meta.today && o.status !== 'paid' && o.status !== 'skipped').reduce((s, o) => s + o.expected, 0);
 
-  const groups: { type: Recurring['type']; title: string }[] = [
-    { type: 'bill', title: 'Bills' }, { type: 'subscription', title: 'Subscriptions' },
-    { type: 'saving', title: 'Savings and debt repayments' }, { type: 'income', title: 'Income' },
+  // One group per Plan series; savings and debt repayments are separate.
+  const groups: { key: keyof Plan['monthly']; type: Recurring['type']; debt?: boolean; title: string }[] = [
+    { key: 'bills', type: 'bill', title: 'Bills' }, { key: 'subscriptions', type: 'subscription', title: 'Subscriptions' },
+    { key: 'savings', type: 'saving', debt: false, title: 'Savings' }, { key: 'debts', type: 'saving', debt: true, title: 'Debt repayments' },
+    { key: 'income', type: 'income', title: 'Income' },
   ];
   const rises = items.filter((i) => i.active && i.type !== 'income' && i.lastChange && i.lastChange.to > i.lastChange.from && i.lastChange.date >= addDaysIso(meta.today, -120));
 
@@ -98,13 +101,13 @@ export function Bills() {
       </Card>
 
       {groups.map((g) => {
-        const list = items.filter((i) => i.type === g.type);
+        const list = items.filter((i) => i.type === g.type && (g.debt === undefined || !!i.isDebt === g.debt));
         if (list.length === 0 && g.type !== 'income') return null;
         if (list.length === 0 && items.length === 0) return null;
-        const total = list.filter((i) => i.active).reduce((s, i) => s + i.monthlyNet, 0);
+        const total = plan.monthly[g.key];
         const anyShared = list.some((i) => i.active && i.sharedBack > 0);
         return (
-          <Card key={g.type} title={g.title} pad={false} action={
+          <Card key={g.key} title={g.title} pad={false} action={
             g.type === 'income'
               ? <span className="row gap"><span className="muted small">{money(total)} a month regular pay</span>
                   <button className="btn btn-sm" onClick={() => setEditing({ draft: { type: 'income', oneOff: true, name: 'Bonus', categoryId: categories.find((c) => c.name === 'Bonuses')?.id ?? null } })}><Icon name="plus" size={14} /> Expected bonus</button></span>
@@ -189,10 +192,10 @@ function DueList({ upcoming, resetKey, render }: { upcoming: Occurrence[]; reset
 export function PlanBreakdown({ plan }: { plan: Plan }) {
   const income = Math.max(plan.incomeExpected, 1);
   const parts = [
-    { label: 'Bills and subscriptions', value: plan.billsTotal, colour: '#eab308', sub: `${money(plan.billsPaid, { compact: true })} paid` },
-    { label: 'Savings', value: plan.savingsTotal, colour: 'var(--saved)', sub: `${money(plan.savingsDone, { compact: true })} moved` },
-    ...(plan.debtTotal > 0 ? [{ label: 'Debt repayments', value: plan.debtTotal, colour: 'var(--bad)', sub: `${money(plan.debtDone, { compact: true })} paid` }] : []),
-    { label: 'Everyday spending so far', value: Math.max(0, plan.otherSpending), colour: 'var(--spend)' },
+    { label: 'Bills and subscriptions', value: plan.billsTotal, colour: SERIES.bills.colour, sub: `${money(plan.billsPaid, { compact: true })} paid` },
+    { label: 'Savings', value: plan.savingsTotal, colour: SERIES.savings.colour, sub: `${money(plan.savingsDone, { compact: true })} moved` },
+    ...(plan.debtTotal > 0 ? [{ label: 'Debt repayments', value: plan.debtTotal, colour: SERIES.debts.colour, sub: `${money(plan.debtDone, { compact: true })} paid` }] : []),
+    { label: 'Everyday spending so far', value: Math.max(0, plan.otherSpending), colour: SERIES.spending.colour },
   ];
   const free = plan.freeToSpend;
   return (

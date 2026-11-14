@@ -3,6 +3,18 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.15.0",
+    "date": "2026-11-14",
+    "changes": [
+      "Overview, Bills and income, and Payday now show the same bills, savings and debt repayments for the month",
+      "Shared bills count only your share everywhere",
+      "Savings include your goals' monthly amounts, and tick off when the money arrives",
+      "Payday plans the month its pay is for, the same month Overview shows",
+      "Bills and income: Savings and Debt repayments are separate groups",
+      "Weekly budgets count as a month the same way everywhere (× 52 ÷ 12)"
+    ]
+  },
+  {
     "version": "1.14.0",
     "date": "2026-11-14",
     "changes": [

@@ -448,7 +448,7 @@ function PayGuide({ month, onCreate, startOpen = false }: { month: string; onCre
   const sourceText = g.takeHome.source === 'manual' ? 'set by you' : g.takeHome.source === 'salary' ? 'from your salary in Bills and income' : g.takeHome.source === 'average' ? 'average income, last 3 months' : 'not set';
   const parts: { key: 'needs' | 'wants' | 'savings'; label: string; colour: string; note: string }[] = [
     { key: 'needs', label: 'Needs', colour: 'var(--spend)', note: 'Rent, bills, groceries, transport' },
-    { key: 'wants', label: 'Wants', colour: '#8b5cf6', note: 'Eating out, shopping, fun' },
+    { key: 'wants', label: 'Wants', colour: 'var(--wants)', note: 'Eating out, shopping, fun' },
     { key: 'savings', label: 'Savings', colour: 'var(--saved)', note: 'Money moved to savings and investments' },
   ];
 

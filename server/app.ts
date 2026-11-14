@@ -24,7 +24,7 @@ import { previewImport, commitImport, undoImport, listImports, listSkipped, rest
 import { PRESETS } from './importers/presets.ts';
 import { monthOf, todayIso, addDays, daysInMonth } from './dates.ts';
 import {
-  createRecurring, updateRecurring, deleteRecurring, listRecurring, occurrences, monthPlan, setPayment, suggestRecurring, dismissSuggestion, autoMatch, FREQUENCIES,
+  createRecurring, updateRecurring, deleteRecurring, listRecurring, occurrences, setPayment, suggestRecurring, dismissSuggestion, autoMatch, FREQUENCIES,
 } from './recurring.ts';
 import { listBudgets, createBudget, updateBudget, deleteBudget, reorderBudgets, suggestBudgets, budgetCategoryIds, budgetAccount, budgetGuide, updateGuide } from './budgets.ts';
 import { listDebts, debtPlan, saveDebtPlan, saveDebt, createDebt, deleteDebtDetails, linkCandidates, linkToDebt, reviewRepayments, debtTimeline, archiveDebt, addRepaymentToBills, DEBT_TYPES } from './debts.ts';
@@ -35,6 +35,7 @@ import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { setEarlierYearTransfer } from './contributions.ts';
 import { payCycle } from './paycycle.ts';
+import { monthPlan } from './plan.ts';
 import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
 import { notifySettings, updateNotifySettings } from './notify.ts';

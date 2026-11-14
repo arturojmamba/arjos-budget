@@ -40,7 +40,7 @@ test('pay check, plan arithmetic, and bills covered by a budget are not counted 
   assert.equal(r.pay.arrived, true);
   assert.equal(r.pay.diff, 230000 - 240000);
   const rent = r.plan.bills.items.find((b) => b.name === 'Rent')!;
-  assert.equal(rent.date, '2026-10-30', 'rent on payday comes out of this pay');
+  assert.equal(rent.date, '2026-11-30', 'the plan is for the funded month (November), the same one Overview and Bills show');
   assert.equal(rent.coveredBy, 'Housing');
   const gym = r.plan.bills.items.find((b) => b.name === 'Gym')!;
   assert.equal(gym.coveredBy, null);

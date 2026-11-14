@@ -14,7 +14,7 @@
  *   minus transfers out; market growth and interest don't count.
  */
 import { type DB, tx } from './db.ts';
-import { ValidationError, assertPence } from './money.ts';
+import { ValidationError, assertPence, perMonth } from './money.ts';
 import { addDays, addMonths, daysBetween, daysInMonth, monthOf, todayIso } from './dates.ts';
 
 export type BudgetPeriod = 'weekly' | 'monthly' | 'annual';
@@ -213,7 +213,7 @@ export function listBudgets(db: DB, month: string, today = todayIso()) {
     const cats = catsOf.get(b.id)!;
     if (b.period === 'monthly') { total += b.available; cats.forEach((c) => counted.add(c)); }
     if (b.period === 'weekly' && !cats.every((c) => monthlyCats.has(c))) {
-      total += Math.round((b.limit * daysInMonth(month)) / 7);
+      total += perMonth(b.limit, 'weekly');
       cats.forEach((c) => counted.add(c));
     }
   }
@@ -244,7 +244,7 @@ export function listBudgets(db: DB, month: string, today = todayIso()) {
   const unbudgetedList = [...byTop.values()].filter((e) => e.amount > 0).sort((a, b) => b.amount - a.amount);
 
   const pay = takeHome(db, today);
-  const monthlyGoal = (b: BudgetView) => (b.period === 'monthly' ? b.available : b.period === 'weekly' ? Math.round((b.limit * daysInMonth(month)) / 7) : 0);
+  const monthlyGoal = (b: BudgetView) => (b.period === 'monthly' ? b.available : b.period === 'weekly' ? perMonth(b.limit, 'weekly') : 0);
   const monthlyGoals = goals.filter((g) => g.period !== 'annual');
   return {
     month,
