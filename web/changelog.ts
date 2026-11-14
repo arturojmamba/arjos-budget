@@ -3,6 +3,16 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.14.0",
+    "date": "2026-11-14",
+    "changes": [
+      "Paydays come from one place, bank holidays included: the Overview and Payday rings always show the same cycle",
+      "A bonus or interest payment can no longer be mistaken for payday",
+      "Your pay always counts towards next month when it lands in the last few days, even if its category isn't marked",
+      "Payday's back arrow goes to the exact previous payday"
+    ]
+  },
+  {
     "version": "1.13.0",
     "date": "2026-11-14",
     "changes": [

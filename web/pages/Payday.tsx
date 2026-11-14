@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, qs, type Plan } from '../api.ts';
-import { PaceRings, PaceKey, paceTone, cycleProgress } from '../components/PaceRings.tsx';
+import { PaceRings, PaceKey, paceTone } from '../components/PaceRings.tsx';
 import { money, monthLabel, parseAmount, pct, penceToInput, shortDate, niceName } from '../format.ts';
 import { Badge, Card, Money, Progress, useApp, useConfirm, useData } from '../components/ui.tsx';
 import { Icon, CatGlyph } from '../components/Icon.tsx';
@@ -8,7 +8,7 @@ import { navigate, setParams } from '../router.ts';
 
 interface Move { key: string; kind: 'goal' | 'saving' | 'debt' | 'card'; title: string; to: string; amount: number; due: string | null; status: 'done' | 'partial' | 'waiting' | 'skipped'; moved: number; movedOn: string | null; note: string | null }
 interface PaydayData {
-  cycle: string; next: string; period: string; closing: string; today: string; daysSince: number; daysToNext: number;
+  cycle: string; next: string; previous: string; progress: number; period: string; nextPeriod: string; closing: string; today: string; daysSince: number; daysToNext: number;
   steps: Record<'pay' | 'close' | 'plan' | 'moves' | 'budgets', boolean>;
   pay: { name: string; expected: number | null; date: string; actual: number | null; actualDate: string | null; description: string | null; diff: number | null; arrived: boolean; other: { date: string; description: string; amount: number }[] };
   close: { month: string; income: number; spending: number; saved: number; savingsRate: number | null; budgets: { id: number; name: string; icon: string | null; colour: string; limit: number; spent: number; over: boolean }[]; looseEnds: { title: string; detail: string; link: string; linkLabel: string }[] };
@@ -72,7 +72,7 @@ export function Payday({ params }: { params: URLSearchParams }) {
   const ownCount = data.items.length;
   const stepKeys = order.filter((k) => !(k === 'own' && ownCount === 0));
   const doneCount = stepKeys.filter(isDone).length;
-  const prevCycle = `${shiftMonth(data.cycle.slice(0, 7), -1)}-28`;
+  const prevCycle = data.previous;
   const isCurrent = data.cycle <= data.today && data.next > data.today;
   const upcoming = data.cycle > data.today;
 
@@ -89,7 +89,7 @@ export function Payday({ params }: { params: URLSearchParams }) {
         </div>
         <div className="payday-head-side">
         {isCurrent && monthPlan && monthPlan.incomeExpected > 0 && (() => {
-          const time = cycleProgress(data.today, data.cycle, data.next);
+          const time = data.progress;
           const free = monthPlan.freeToSpend;
           const pot = monthPlan.otherSpending + Math.max(0, free);
           const used = free < 0 ? 1 : pot > 0 ? monthPlan.otherSpending / pot : 0;
@@ -256,7 +256,7 @@ export function Payday({ params }: { params: URLSearchParams }) {
           </ul>
         </Card>
         <Card title="Next payday">
-          <div className="glance-pay"><strong>{shortDate(data.next)}</strong><span className="muted small">{data.daysToNext > 0 ? `in ${data.daysToNext} day${data.daysToNext === 1 ? '' : 's'}` : 'today'} · pays for {monthLabel(addMonthsClient(data.period, 1))}</span></div>
+          <div className="glance-pay"><strong>{shortDate(data.next)}</strong><span className="muted small">{data.daysToNext > 0 ? `in ${data.daysToNext} day${data.daysToNext === 1 ? '' : 's'}` : 'today'} · pays for {monthLabel(data.nextPeriod)}</span></div>
           <button className="btn btn-sm" style={{ marginTop: 10 }} onClick={() => setParams('/payday', { cycle: data.next })}>Plan it now <Icon name="chevron-right" size={14} /></button>
         </Card>
       </aside>

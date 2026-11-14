@@ -19,3 +19,21 @@ _Avoid_: Money put in (that is all-time, not per tax year), subscriptions
 **Earlier-year transfer**:
 An ISA transferred in from another provider that holds money paid in during earlier tax years. It is Money put in, but not Paid in for this tax year.
 _Avoid_: ISA transfer (too broad), carried-in subscriptions
+
+## Pay
+
+**Your pay**:
+The person's biggest active monthly income in Bills and income. Paydays, the pay cycle and the funded month all follow it.
+_Avoid_: Salary (fine in conversation, but not every pay is a salary), income (too broad: bonuses and interest are income too)
+
+**Payday**:
+The date your pay lands: the last working day of the month (bank holidays included) or a fixed day of the month.
+_Avoid_: Cycle (in the code this used to mean the payday date), pay date
+
+**Pay cycle**:
+The stretch from one payday to the next. The pace rings measure time through it.
+_Avoid_: Cycle on its own, pay period
+
+**Funded month**:
+The month a payday pays for. Pay that lands in the last few days of a month (Settings → Budgeting, 5 by default) funds the next month; otherwise it funds the month it lands in.
+_Avoid_: Period (in the code this is the funded month), budget month

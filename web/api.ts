@@ -104,6 +104,8 @@ export interface Occurrence {
   paidAmount: number | null; paidDate: string | null; transactionId: number | null; accountName: string;
   categoryColour: string | null; categoryIcon: string | null; isDebt: boolean;
 }
+/** The pay cycle containing today, from the server (see GLOSSARY.md). */
+export interface PayCycle { hasPay: boolean; start: string; end: string; previous: string; fundedMonth: string; daysIn: number; daysLeft: number; progress: number }
 export interface Plan {
   month: string; incomeExpected: number; incomeReceived: number; incomeExtra: number; billsTotal: number; billsPaid: number; billsRemaining: number;
   savingsTotal: number; savingsDone: number; debtTotal: number; debtDone: number; committed: number; committedShare: number | null; otherSpending: number; freeToSpend: number;

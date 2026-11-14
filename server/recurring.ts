@@ -7,6 +7,7 @@
  * recurring_payments. Due dates without a match are upcoming or overdue.
  */
 import { type DB, tx, getSetting, setSetting } from './db.ts';
+import { landsLate, isYourPay } from './paycycle.ts';
 import { ValidationError, assertPence } from './money.ts';
 import { addDays, addMonths, daysBetween, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
 import { lastWorkingDay } from './calendar.ts';
@@ -97,14 +98,14 @@ export function monthlyEquivalent(amount: number, frequency: Frequency): number 
   return Math.round((amount * perYear) / 12);
 }
 
-/** Month an expected income counts towards (late-month salary funds next month). */
+/** Month an expected income counts towards: your pay, or income whose category is marked, funds next month when it lands late. */
 function incomePeriod(db: DB, r: RecurringRow, due: string): string {
   const month = monthOf(due);
-  if (r.type !== 'income' || !r.category_id) return month;
+  if (r.type !== 'income' || !landsLate(db, due)) return month;
+  if (isYourPay(db, { recurringId: r.id })) return addMonths(month, 1);
+  if (!r.category_id) return month;
   const cat = db.prepare('SELECT roll_forward FROM categories WHERE id = ?').get(r.category_id) as { roll_forward: number } | undefined;
-  const days = parseInt(getSetting(db, 'rollforward_days', '5'), 10);
-  if (!cat?.roll_forward || !days) return month;
-  return Number(due.slice(8, 10)) > daysInMonth(month) - days ? addMonths(month, 1) : month;
+  return cat?.roll_forward ? addMonths(month, 1) : month;
 }
 
 // ---------------------------------------------------------------------------

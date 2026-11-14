@@ -1,6 +1,6 @@
-import { PaceRings, PaceKey, paceTone, cycleProgress, lastPayday, useDrawOnce } from '../components/PaceRings.tsx';
+import { PaceRings, PaceKey, paceTone, useDrawOnce } from '../components/PaceRings.tsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { api, qs, type Summary, type Plan, type Occurrence, type MonthSpending } from '../api.ts';
+import { api, qs, type Summary, type Plan, type Occurrence, type MonthSpending, type PayCycle } from '../api.ts';
 import { money, monthLabel, pct, dayMonth, relativeDay, addMonths, shortDate, privateLabel, niceName } from '../format.ts';
 import { Badge, Card, Empty, Money, Stat, useApp, useData, Bubble, Progress, usePaged } from '../components/ui.tsx';
 import { Donut, IncomeSpendBars, Cumulative } from '../components/charts.tsx';
@@ -20,13 +20,13 @@ export function Overview({ month }: { month: string }) {
   const { data: plan } = useData<Plan>(() => api.get(`/api/plan${qs({ month })}`), [month]);
   const { data: upcoming } = useData<Occurrence[]>(() => api.get('/api/upcoming?days=35'), []);
   const { data: budgets } = useData<BudgetList>(() => api.get(`/api/budgets${qs({ month })}`), [month]);
+  const { data: cycle } = useData<PayCycle>(() => api.get('/api/pay-cycle'), []);
   const statsRef = useNavyBand();
   if (error) return <Empty icon="alert" title="Couldn't load your summary">{error}</Empty>;
   if (!s || !plan) return <div className="loading" />;
   const isCurrent = month === meta.currentMonth;
   const open = (upcoming ?? []).filter((o) => o.status !== 'paid' && o.status !== 'skipped');
   const dueSoon = open.filter((o) => o.dueDate <= addDays(meta.today, 30)).slice(0, 6);
-  const payday = open.find((o) => o.type === 'income')?.dueDate ?? null;
   const showPlan = plan.billsTotal > 0 || plan.savingsTotal > 0 || plan.debtTotal > 0 || plan.incomeExpected > 0;
   // This month with a plan: one tile answers "how am I doing?", so the rest needn't repeat it.
   const heroOn = isCurrent && plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0);
@@ -63,7 +63,7 @@ export function Overview({ month }: { month: string }) {
       <HealthBanner />
 
       <div ref={statsRef} className={`stats ${heroOn ? 'stats-hero' : ''} on-navy band-stats`}>
-        {heroOn && <FreeHero s={s} plan={plan} payday={payday} today={meta.today} />}
+        {heroOn && cycle && <FreeHero s={s} plan={plan} cycle={cycle} />}
         <Stat label="Income" value={<Money value={s.income} />}
           sub={plan.incomeExpected > s.income ? `${money(plan.incomeExpected - s.income, { compact: true })} still expected`
             : plan.incomeExtra > 0 ? `Incl. ${money(plan.incomeExtra, { compact: true })} above usual pay`
@@ -84,7 +84,7 @@ export function Overview({ month }: { month: string }) {
         {showPlan && (
           <Card className="plan-card fit-row" title={isCurrent ? 'This month' : monthLabel(month)} action={<button className="link-btn" onClick={() => navigate('/bills')}>Bills</button>}>
             <PlanBreakdown plan={plan} />
-            <MonthPace s={s} plan={plan} payday={isCurrent ? payday : null} today={meta.today} catIcon={catIcon} hero={heroOn} />
+            <MonthPace s={s} plan={plan} cycle={isCurrent ? cycle : null} catIcon={catIcon} hero={heroOn} />
           </Card>
         )}
       </div>
@@ -304,23 +304,20 @@ function SpendingByCategory({ s, month }: { s: Summary; month: string }) {
  * to payday. Over (red) when the plan costs more than this month's pay; "Spending faster" (amber)
  * when well ahead of last month at the same point; otherwise on track (green).
  */
-function FreeHero({ s, plan, payday, today }: { s: Summary; plan: Plan; payday: string | null; today: string }) {
+function FreeHero({ s, plan, cycle }: { s: Summary; plan: Plan; cycle: PayCycle }) {
   const p = s.pace;
   const free = plan.freeToSpend;
-  const daysLeft = payday ? Math.max(1, daysBetween(today, payday)) : Math.max(1, p.daysInMonth - p.day + 1);
+  const daysLeft = cycle.daysLeft;
   const perDay = free > 0 ? Math.floor(free / daysLeft) : 0;
   const ahead = p.isCurrent && p.lastMonthToDate > 0 ? p.spentToDate - p.lastMonthToDate : 0;
-  // The rings: time through the pay cycle against the share of spending money used.
-  const month = plan.month;
-  const start = payday ? lastPayday(month) : `${month}-01`;
-  const end = payday ?? `${month}-${String(p.daysInMonth).padStart(2, '0')}`;
-  const time = cycleProgress(today, start, end);
+  // The rings: time through the pay cycle (from the server) against the share of spending money used.
+  const time = cycle.progress;
   const pot = plan.otherSpending + Math.max(0, free);
   const used = free < 0 ? 1 : pot > 0 ? plan.otherSpending / pot : 0;
   const tone = paceTone(time, used, free < 0);
   const drawIn = useDrawOnce();
   const verdict = tone === 'bad' ? 'Over' : tone === 'warn' ? 'Spending ahead of time' : 'On track';
-  const until = payday ? `until payday` : `left this month`;
+  const until = cycle.hasPay ? `until payday` : `left this month`;
   return (
     <div className="stat stat-hero">
       <div className="stat-hero-body">
@@ -344,11 +341,12 @@ function FreeHero({ s, plan, payday, today }: { s: Summary; plan: Plan; payday: 
 }
 
 /** How the month is going: pace against last month, a daily allowance until payday, and the biggest purchases. */
-function MonthPace({ s, plan, payday, today, catIcon, hero }: { s: Summary; plan: Plan; payday: string | null; today: string; catIcon: (id: number | null) => string; hero?: boolean }) {
+function MonthPace({ s, plan, cycle, catIcon, hero }: { s: Summary; plan: Plan; cycle: PayCycle | null | undefined; catIcon: (id: number | null) => string; hero?: boolean }) {
   const { categories } = useApp();
   const p = s.pace;
   const diff = p.spentToDate - p.lastMonthToDate;
-  const daysLeft = payday ? Math.max(1, daysBetween(today, payday)) : Math.max(1, p.daysInMonth - p.day + 1);
+  const payday = cycle?.hasPay ? cycle.end : null;
+  const daysLeft = cycle ? cycle.daysLeft : Math.max(1, p.daysInMonth - p.day + 1);
   const perDay = plan.freeToSpend > 0 ? Math.floor(plan.freeToSpend / daysLeft) : 0;
   const hasPlan = plan.incomeExpected > 0 && (plan.billsTotal > 0 || plan.savingsTotal > 0);
   const fit = useFitList(s.topSpends.length);

@@ -8,22 +8,6 @@ export function paceTone(time: number, money: number, over: boolean): PaceTone {
   return money > time + 0.1 ? 'warn' : 'good';
 }
 
-/** How far through the pay cycle today is, from the last payday to the next (0–1). */
-export function cycleProgress(today: string, start: string, end: string): number {
-  const t = (d: string) => Date.parse(`${d}T12:00:00Z`);
-  const span = t(end) - t(start);
-  if (span <= 0) return 1;
-  return Math.min(1, Math.max(0, (t(today) - t(start) + 43_200_000) / span));
-}
-
-/** The last weekday of the month before `month` (YYYY-MM): roughly when last month's pay landed. */
-export function lastPayday(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1, 0));
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
 /**
  * Coil's pace rings. Outer: how far through the pay cycle you are. Inner: how much of this month's
  * spending money has gone, with the snake's head at its tip. Inner behind outer means you're fine.

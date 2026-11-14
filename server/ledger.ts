@@ -1,4 +1,5 @@
 import { type DB, tx, getSetting } from './db.ts';
+import { landsLate, yourPay, isYourPay } from './paycycle.ts';
 import { assertPence, ValidationError, type Pence } from './money.ts';
 import { isIsoDate, monthOf, addMonths, daysInMonth } from './dates.ts';
 
@@ -130,21 +131,22 @@ function validate(db: DB, input: TransactionInput) {
   }
 }
 
-/** Work out the reporting month. Late-month salary funds next month. */
+/**
+ * Work out the reporting month. Income landing late in a month funds the next one when it's
+ * your pay, or its category is marked "counts next month if paid late" (see paycycle.ts).
+ */
 export function resolvePeriod(db: DB, input: TransactionInput): string {
   if (input.period) return input.period;
   const month = monthOf(input.date);
-  if (input.kind !== 'income') return month;
-  const days = parseInt(getSetting(db, 'rollforward_days', '5'), 10);
-  if (!days) return month;
+  if (input.kind !== 'income' || !landsLate(db, input.date)) return month;
+  const pay = yourPay(db);
   const rolls = input.postings.some((p) => {
     if (p.categoryId == null || p.amount <= 0) return false;
+    if (isYourPay(db, { categoryId: p.categoryId }, pay)) return true;
     const c = db.prepare('SELECT roll_forward FROM categories WHERE id = ?').get(p.categoryId) as { roll_forward: number } | undefined;
     return c?.roll_forward === 1;
   });
-  if (!rolls) return month;
-  const day = parseInt(input.date.slice(8, 10), 10);
-  return day > daysInMonth(month) - days ? addMonths(month, 1) : month;
+  return rolls ? addMonths(month, 1) : month;
 }
 
 export function normaliseMerchant(description: string): string {

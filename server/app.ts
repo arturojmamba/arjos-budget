@@ -34,6 +34,7 @@ import { saveShares } from './shares.ts';
 import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { setEarlierYearTransfer } from './contributions.ts';
+import { payCycle } from './paycycle.ts';
 import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
 import { notifySettings, updateNotifySettings } from './notify.ts';
@@ -441,6 +442,7 @@ route('POST', '/api/notifications/test', () => {
 route('POST', '/api/desktop/relaunch', () => { const host = needDesktop(); setTimeout(() => host.relaunch(), 150); return { ok: true }; });
 route('GET', '/api/t212/status', ({ db }) => syncStatus(db, trading212Config()));
 route('POST', '/api/t212/sync', ({ db, body }) => { startSync(db, trading212Config(), {}, { force: body?.force === true }); return { ok: true }; });
+route('GET', '/api/pay-cycle', ({ db }) => payCycle(db));
 route('GET', '/api/isa', ({ db }) => isaAllowanceSummary(db));
 route('GET', '/api/isa/details', ({ db }) => isaStatus(db));
 route('POST', '/api/isa/earlier-year', ({ db, body }) => {

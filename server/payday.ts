@@ -13,7 +13,7 @@
 import { type DB, tx } from './db.ts';
 import { ValidationError, assertPence } from './money.ts';
 import { addDays, addMonths, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
-import { lastWorkingDay } from './calendar.ts';
+import { yourPay, paydayIn, paydayOnOrBefore, payCycle, cycleFrom, fundedMonth } from './paycycle.ts';
 import { occurrences, listRecurring } from './recurring.ts';
 import { listBudgets } from './budgets.ts';
 import { listGoals } from './goals.ts';
@@ -24,27 +24,9 @@ import { budgetRecord } from './insights.ts';
 
 export const STEPS = ['pay', 'close', 'plan', 'moves', 'budgets'] as const;
 
-interface SalaryRow { id: number; name: string; amount: number; schedule: string; start_date: string; account_id: number; category_id: number | null }
-
-/** Your main pay: the biggest active monthly income item, if you've set one up. */
-function salary(db: DB): SalaryRow | null {
-  return (db.prepare(
-    "SELECT id, name, amount, schedule, start_date, account_id, category_id FROM recurring WHERE type = 'income' AND active = 1 AND frequency = 'monthly' ORDER BY amount DESC LIMIT 1",
-  ).get() as SalaryRow | undefined) ?? null;
-}
-
-/** The date pay lands in a month: last working day, or the same day of the month as the first payment. */
-function payDateIn(month: string, s: SalaryRow | null): string {
-  if (!s || s.schedule === 'last_working_day') return lastWorkingDay(month);
-  const day = Math.min(Number(s.start_date.slice(8, 10)), daysInMonth(month));
-  return `${month}-${String(day).padStart(2, '0')}`;
-}
-
-/** The latest payday on or before a date. */
+/** The latest payday on or before a date (kept for older callers; see paycycle.ts). */
 export function currentCycle(db: DB, today = todayIso()): string {
-  const s = salary(db);
-  const here = payDateIn(monthOf(today), s);
-  return here <= today ? here : payDateIn(addMonths(monthOf(today), -1), s);
+  return paydayOnOrBefore(db, today);
 }
 
 function checks(db: DB, cycle: string): Map<string, string> {
@@ -67,13 +49,14 @@ function movedInto(db: DB, accountId: number, from: string, to: string) {
 }
 
 export function payday(db: DB, cycleIn?: string | null, today = todayIso()) {
-  const s = salary(db);
+  const s = yourPay(db);
   // Any date in a month means that month's payday.
-  const cycle = cycleIn && isIsoDate(cycleIn) ? payDateIn(monthOf(cycleIn), s) : currentCycle(db, today);
-  const next = payDateIn(addMonths(monthOf(cycle), 1), s);
+  const pc = cycleIn && isIsoDate(cycleIn) ? cycleFrom(db, cycleIn, today) : s ? payCycle(db, today) : cycleFrom(db, paydayOnOrBefore(db, today, null), today);
+  const cycle = pc.start;
+  const next = pc.end;
   const windowEnd = addDays(next, -1);
-  const period = addMonths(monthOf(cycle), 1); // the month this pay funds
-  const closing = monthOf(cycle); // the month that's ending
+  const period = pc.fundedMonth; // the month this pay funds
+  const closing = addMonths(period, -1); // the month that's ending
   const done = checks(db, cycle);
 
   // 1. Pay
@@ -208,7 +191,8 @@ export function payday(db: DB, cycleIn?: string | null, today = todayIso()) {
   const movesDone = moves.length > 0 && moves.every((m) => m.status === 'done' || m.status === 'skipped');
   const stepDone: Record<string, boolean> = Object.fromEntries(STEPS.map((k) => [k, done.has(k) || (k === 'moves' && movesDone)]));
   return {
-    cycle, next, period, closing, today,
+    cycle, next, previous: pc.previous, period, nextPeriod: fundedMonth(db, next), closing, today,
+    progress: pc.progress,
     daysSince: Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${cycle}T12:00:00Z`)) / 86400000),
     daysToNext: Math.round((Date.parse(`${next}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000),
     steps: stepDone,
@@ -227,7 +211,7 @@ export function paydayStatus(db: DB, today = todayIso()) {
   const days = Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${cycle}T12:00:00Z`)) / 86400000);
   const items = (db.prepare('SELECT COUNT(*) AS n FROM payday_items').get() as { n: number }).n;
   return {
-    cycle, period: addMonths(monthOf(cycle), 1), daysSince: days,
+    cycle, period: fundedMonth(db, cycle), daysSince: days,
     stepsDone: STEPS.filter((k) => c.has(k)).length, stepsTotal: STEPS.length + 1 + items,
     completedAt: log?.completed_at ?? null,
     // Show the nudge for the first ten days after payday, until it's done.
@@ -238,7 +222,7 @@ export function paydayStatus(db: DB, today = todayIso()) {
 /** Set limits for the month this pay funds (monthly budgets) without touching earlier months. */
 export function setPaydayBudgets(db: DB, cycle: string, limits: Record<string, number>) {
   if (!isIsoDate(cycle)) throw new ValidationError('Unknown payday');
-  const start = `${addMonths(monthOf(cycle), 1)}-01`;
+  const start = `${fundedMonth(db, paydayIn(monthOf(cycle), yourPay(db)))}-01`;
   tx(db, () => {
     for (const [id, amount] of Object.entries(limits ?? {})) {
       const pence = assertPence(amount, 'Limit');

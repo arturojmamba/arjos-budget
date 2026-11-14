@@ -152,7 +152,7 @@ function BudgetingCard() {
     <Card title="Monthly budget period">
       <p className="muted">Months follow the calendar. Because you're paid on the last working day, salary that lands in the last few days of a month counts towards the <em>next</em> month, so October's payday funds November.</p>
       <div className="row gap end">
-        <Field label="Days before month end" hint="0 turns this off. Applies to income categories marked “paid at the end of the month”.">
+        <Field label="Days before month end" hint="0 turns this off. Applies to your pay (your biggest monthly income in Bills and income) and to income whose category is marked “Counts next month if paid late”.">
           <input type="number" min={0} max={10} value={days} onChange={(e) => setDays(e.target.value)} />
         </Field>
         <button className="btn" onClick={saveDays} disabled={days === String(meta.settings.rollforwardDays)}>Save</button>
