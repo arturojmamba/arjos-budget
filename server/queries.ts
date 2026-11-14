@@ -1,4 +1,5 @@
 import type { DB } from './db.ts';
+import { contributions, type ContributionSource } from './contributions.ts';
 import { isLiability } from './ledger.ts';
 import { addMonths, monthOf, todayIso, daysInMonth } from './dates.ts';
 import { parseMoney } from './money.ts';
@@ -27,6 +28,7 @@ export interface AccountView {
   syncError: string | null;
   /** Investments only: money paid in (ledger balance), last valuation date and growth. */
   contributed: number | null;
+  contributionSource: ContributionSource | null;
   valuationDate: string | null;
   growth: number | null;
 }
@@ -55,16 +57,11 @@ export function listAccounts(db: DB, opts: { asOf?: string; includeArchived?: bo
     let balance = r.balance;
     let contributed: number | null = null;
     let valuationDate: string | null = null;
+    let contributionSource: ContributionSource | null = null;
     if (r.type === 'investment') {
-      contributed = r.balance;
-      // Synced with Trading 212: what you've put in is what Trading 212 recorded (deposits less
-      // withdrawals), the same figure Investing shows. Matched bank transfers can miss deposits.
-      if (r.sync_provider === 'trading212') {
-        const t = db.prepare(
-          "SELECT COUNT(*) AS n, IFNULL(SUM(CASE WHEN type IN ('DEPOSIT','TRANSFER','WITHDRAW') THEN amount ELSE 0 END), 0) AS net FROM t212_cash WHERE account_id = ? AND substr(date_time, 1, 10) <= ?",
-        ).get(r.id, asOf) as { n: number; net: number };
-        if (t.n > 0) contributed = t.net;
-      }
+      const c = contributions(db, r.id);
+      contributed = c.putIn(asOf);
+      contributionSource = c.source;
       // Market value = latest valuation on or before the date, plus anything paid in or out since.
       const v = db.prepare('SELECT date, value FROM valuations WHERE account_id = ? AND date <= ? ORDER BY date DESC LIMIT 1').get(r.id, asOf) as { date: string; value: number } | undefined;
       if (v) {
@@ -96,6 +93,7 @@ export function listAccounts(db: DB, opts: { asOf?: string; includeArchived?: bo
     lastSyncedAt: r.last_synced_at ?? null,
     syncError: r.sync_error ?? null,
     contributed,
+    contributionSource,
     valuationDate,
     growth: contributed === null || valuationDate === null ? null : balance - contributed,
     };

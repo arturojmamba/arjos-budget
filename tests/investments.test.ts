@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { testDb } from './fixtures.ts';
 import { createTransaction, simpleToPostings } from '../server/ledger.ts';
 import { listAccounts, monthSummary, monthTotals } from '../server/queries.ts';
-import { setValuation, isaAllowance, taxYear, parseSummary, syncTrading212, investmentHistory } from '../server/investments.ts';
+import { setValuation, taxYear, parseSummary, syncTrading212, investmentHistory } from '../server/investments.ts';
 import { todayIso, addDays } from '../server/dates.ts';
 import { previewImport } from '../server/importers/import.ts';
+import { isaStatus } from '../server/isa.ts';
 
 function setup() {
   const db = testDb();
@@ -42,8 +43,9 @@ test('ISA allowance counts paid-in money in the 6 April – 5 April tax year', (
   pay('2026-04-05', 70000); // previous tax year
   pay('2026-04-06', 30000);
   pay('2026-11-01', 50000);
-  const a = isaAllowance(db, '2026-11-12');
+  const a = isaStatus(db, '2026-11-12');
   assert.equal(a.taxYear, '2026/27');
+  assert.equal(a.source, 'bank');
   assert.equal(a.used, 80000);
   assert.equal(a.remaining, 2_000_000 - 80000);
 });

@@ -26,7 +26,7 @@ interface Portfolio {
   summary: {
     value: number; invested: number; holdingsValue: number; unrealised: number; unrealisedPct: number | null; realised: number | null;
     cash: { total: number | null; free: number | null; inPies: number | null; reserved: number | null };
-    netDeposited: number; deposited: number; withdrawn: number; firstDeposit: string | null; gainOnDeposits: number;
+    netDeposited: number; contributionSource: 'trading212' | 'bank'; deposited: number; withdrawn: number; firstDeposit: string | null; gainOnDeposits: number;
   };
   holdings: Holding[];
   pies: Pie[];
@@ -111,7 +111,7 @@ export function Investing() {
         <Stat label="Return on holdings" value={<Money value={s.unrealised} sign />} tone={s.unrealised >= 0 ? 'good' : 'bad'}
           sub={`${signedPct(s.unrealisedPct)} on ${money(s.invested)} invested`} />
         <Stat label="Money put in" value={<Money value={s.netDeposited} />}
-          sub={s.withdrawn ? `${money(s.deposited)} in, ${money(s.withdrawn)} taken out` : 'deposits'} />
+          sub={`${s.withdrawn ? `${money(s.deposited)} in, ${money(s.withdrawn)} taken out · ` : ''}from ${s.contributionSource === 'trading212' ? 'Trading 212' : 'your bank transfers'}`} />
         <Stat label="Up or down overall" value={<Money value={s.gainOnDeposits} sign />} tone={s.gainOnDeposits >= 0 ? 'good' : 'bad'}
           sub={`value vs money put in${s.realised ? ` · ${money(s.realised, { sign: true })} realised on sales` : ''}`} />
       </div>
@@ -459,15 +459,16 @@ interface Isa {
   source: 'trading212' | 'bank';
   matching: null | {
     matched: { date: string; bankDate: string; amount: number; type: string; from: string | null; fromSavings: boolean; lagDays: number }[];
-    t212Only: { date: string; amount: number; type: string; note: string }[];
+    t212Only: { date: string; amount: number; type: string; note: string; reference: string; earlierYear: boolean }[];
     bankOnly: { date: string; amount: number; from: string | null; description: string; note: string }[];
     fromSavings: number; fromPay: number; bySource: { account: string; amount: number; savings: boolean }[];
   };
 }
 
 function IsaAllowance() {
-  const { data } = useData<Isa>(() => api.get('/api/isa/details'), []);
+  const { data, reload } = useData<Isa>(() => api.get('/api/isa/details'), []);
   const [all, setAll] = useState(false);
+  const setEarlier = async (reference: string, on: boolean) => { await api.post('/api/isa/earlier-year', { reference, on }); reload(); };
   if (!data) return <div className="loading" />;
   const m = data.matching;
   const share = Math.min(1, data.used / data.allowance);
@@ -505,7 +506,15 @@ function IsaAllowance() {
             {(m.t212Only.length > 0 || m.bankOnly.length > 0) ? (
               <div className="sub-list">
                 <span className="muted small">Only on one side</span>
-                {m.t212Only.map((x, i) => <div key={`t${i}`} className="row small gap"><span className="nowrap">{shortDate(x.date)}</span><span className="grow muted">Trading 212 only: {x.note}</span><strong>{money(x.amount, { sign: true })}</strong></div>)}
+                {m.t212Only.map((x, i) => (
+                  <div key={`t${i}`} className="row small gap wrap"><span className="nowrap">{shortDate(x.date)}</span><span className="grow muted">Trading 212 only: {x.note}</span><strong>{money(x.amount, { sign: true })}</strong>
+                    {x.type === 'TRANSFER' && x.amount > 0 && (
+                      <label className="check earlier-year" title="Money paid into another ISA in earlier tax years doesn't use this year's allowance. It still counts as money put in.">
+                        <input type="checkbox" checked={x.earlierYear} onChange={(e) => setEarlier(x.reference, e.target.checked)} /> From earlier years
+                      </label>
+                    )}
+                  </div>
+                ))}
                 {m.bankOnly.map((x, i) => <div key={`b${i}`} className="row small gap"><span className="nowrap">{shortDate(x.date)}</span><span className="grow muted">Bank only ({x.from ?? '?'}): {x.note}</span><strong>{money(x.amount, { sign: true })}</strong></div>)}
               </div>
             ) : <p className="small tone-good"><Icon name="check" size={14} /> Every deposit matches a bank transfer.</p>}

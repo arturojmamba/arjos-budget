@@ -1,6 +1,6 @@
 {
   "name": "finance-app",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "private": true,
   "description": "Local-first personal finance and budgeting app",
   "author": "arjos-budget",

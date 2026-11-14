@@ -1,6 +1,7 @@
 /**
- * ISA allowance (7.4), from Trading 212's own record of deposits and withdrawals
- * when the ISA is synced, otherwise from the transfers on your bank statements.
+ * ISA allowance (7.4): money paid into ISAs this tax year, from Contributions (Trading 212's
+ * own record when the ISA has it, otherwise the transfers on your bank statements).
+ * Earlier-year transfers are money put in but don't use this year's allowance.
  *
  * Trading 212's ISAs are flexible: money taken out can be put back in the same
  * tax year without using allowance. Deposits after a withdrawal replace it first.
@@ -13,12 +14,13 @@
  */
 import { type DB } from './db.ts';
 import { addDays, daysBetween, monthOf, addMonths, todayIso } from './dates.ts';
-import { taxYear, syncedAccounts, ISA_ALLOWANCE } from './investments.ts';
+import { taxYear, ISA_ALLOWANCE } from './investments.ts';
+import { contributions, earlierYearTransfers } from './contributions.ts';
 
 const SAVINGS_TYPES = new Set(['savings', 'pot', 'investment']);
 const MATCH_DAYS = 5;
 
-interface T212Event { date: string; type: string; amount: number; reference: string }
+interface T212Event { date: string; type: string; amount: number; reference: string; earlierYear?: boolean }
 interface BankMove { transactionId: number; date: string; amount: number; account: string | null; accountType: string | null; description: string }
 
 /** Work through the year's deposits and withdrawals in order (flexible ISA rules). */
@@ -36,17 +38,15 @@ export function flexibleUse(events: { date: string; amount: number }[]) {
 
 export function isaStatus(db: DB, today = todayIso()) {
   const ty = taxYear(today);
-  const isaAccounts = db.prepare("SELECT id, name, sync_provider FROM accounts WHERE wrapper = 'isa' AND archived = 0 ORDER BY id").all() as { id: number; name: string; sync_provider: string | null }[];
-  const synced = new Set(syncedAccounts(db));
-  const hasT212 = (db.prepare("SELECT status FROM t212_sync WHERE endpoint = 'cash'").get() as { status: string } | undefined)?.status === 'ok';
+  const isaAccounts = db.prepare("SELECT id, name FROM accounts WHERE wrapper = 'isa' AND archived = 0 ORDER BY id").all() as { id: number; name: string }[];
+  const earlier = earlierYearTransfers(db);
 
   const accounts = isaAccounts.map((a) => {
-    const fromT212 = hasT212 && synced.has(a.id) && a.sync_provider === 'trading212';
+    const c = contributions(db, a.id);
+    const fromT212 = c.source === 'trading212';
+    const TYPE = { deposit: 'DEPOSIT', withdrawal: 'WITHDRAW', transfer: 'TRANSFER' } as const;
     const events: T212Event[] = fromT212
-      ? (db.prepare(
-        `SELECT substr(date_time, 1, 10) AS date, type, amount, reference FROM t212_cash
-         WHERE account_id = ? AND type IN ('DEPOSIT','WITHDRAW','TRANSFER') AND substr(date_time, 1, 10) BETWEEN ? AND ? ORDER BY date_time`,
-      ).all(a.id, ty.start, ty.end) as unknown as T212Event[])
+      ? c.flows(ty.start, ty.end).map((f) => ({ date: f.date, type: TYPE[f.type], amount: f.amount, reference: f.reference, earlierYear: f.type === 'transfer' && earlier.has(f.reference) }))
       : [];
     const bank = db.prepare(
       `SELECT t.id AS transactionId, t.date, p.amount, t.description,
@@ -56,7 +56,8 @@ export function isaStatus(db: DB, today = todayIso()) {
        WHERE p.account_id = ? AND t.kind = 'transfer' AND t.date BETWEEN ? AND ? ORDER BY t.date`,
     ).all(a.id, ty.start, ty.end) as unknown as BankMove[];
 
-    const flex = flexibleUse(fromT212 ? events.map((e) => ({ date: e.date, amount: e.amount })) : bank.map((b) => ({ date: b.date, amount: b.amount })));
+    // Earlier-year transfers are money put in, but not paid in this tax year.
+    const flex = flexibleUse(c.flows(ty.start, ty.end).filter((f) => !(f.type === 'transfer' && earlier.has(f.reference))).map((f) => ({ date: f.date, amount: f.amount })));
     return { id: a.id, name: a.name, source: fromT212 ? 'trading212' as const : 'bank' as const, ...flex, events, bank };
   });
 
@@ -93,7 +94,7 @@ function monthsUntil(today: string, end: string) {
 export function matchDeposits(events: T212Event[], bank: BankMove[]) {
   const free = bank.map((b) => ({ ...b, used: false }));
   const matched: { date: string; bankDate: string; amount: number; type: string; from: string | null; fromSavings: boolean; lagDays: number }[] = [];
-  const t212Only: { date: string; amount: number; type: string; note: string }[] = [];
+  const t212Only: { date: string; amount: number; type: string; note: string; reference: string; earlierYear: boolean }[] = [];
   for (const e of [...events].sort((a, b) => a.date.localeCompare(b.date))) {
     const cands = free.filter((b) => !b.used && b.amount === e.amount && Math.abs(daysBetween(b.date, e.date)) <= MATCH_DAYS)
       .sort((x, y) => Math.abs(daysBetween(x.date, e.date)) - Math.abs(daysBetween(y.date, e.date)));
@@ -103,7 +104,7 @@ export function matchDeposits(events: T212Event[], bank: BankMove[]) {
       matched.push({ date: e.date, bankDate: hit.date, amount: e.amount, type: e.type, from: hit.account, fromSavings: !!hit.accountType && SAVINGS_TYPES.has(hit.accountType) && e.amount > 0, lagDays: daysBetween(hit.date, e.date) });
     } else {
       t212Only.push({
-        date: e.date, amount: e.amount, type: e.type,
+        date: e.date, amount: e.amount, type: e.type, reference: e.reference, earlierYear: !!e.earlierYear,
         note: e.type === 'TRANSFER' ? 'A transfer within Trading 212 or from another provider' : e.amount < 0 ? 'Not on an imported bank statement yet' : 'Not on an imported bank statement: a card deposit, or a statement not imported yet',
       });
     }

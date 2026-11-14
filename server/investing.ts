@@ -5,6 +5,7 @@
 import { type DB } from './db.ts';
 import { ValidationError } from './money.ts';
 import { syncedAccounts } from './investments.ts';
+import { contributions } from './contributions.ts';
 
 interface PositionRow {
   ticker: string; name: string | null; isin: string | null; currency: string | null; quantity: number; quantity_in_pies: number | null;
@@ -88,11 +89,12 @@ export function portfolio(db: DB, accountId?: number) {
   ).get(acc.id) as { date: string; value: number; details: string | null } | undefined;
   const d = latest?.details ? JSON.parse(latest.details) : {};
 
-  const cashRows = db.prepare('SELECT type, SUM(amount) AS s, COUNT(*) AS n FROM t212_cash WHERE account_id = ? GROUP BY type').all(acc.id) as { type: string; s: number; n: number }[];
-  const cashBy = (t: string) => cashRows.find((r) => r.type === t)?.s ?? 0;
-  const deposited = cashBy('DEPOSIT') + cashBy('TRANSFER');
-  const withdrawn = -cashBy('WITHDRAW');
-  const firstDeposit = (db.prepare("SELECT MIN(date_time) AS d FROM t212_cash WHERE account_id = ? AND type IN ('DEPOSIT','TRANSFER')").get(acc.id) as { d: string | null }).d?.slice(0, 10) ?? null;
+  const c = contributions(db, acc.id);
+  const flows = c.flows();
+  const deposited = flows.filter((f) => f.amount > 0).reduce((n, f) => n + f.amount, 0);
+  const withdrawn = -flows.filter((f) => f.amount < 0).reduce((n, f) => n + f.amount, 0);
+  const putIn = c.putIn();
+  const firstDeposit = flows.find((f) => f.amount > 0)?.date ?? null;
 
   const invested = d.totalCost ?? holdings.reduce((n, h) => n + (h.cost ?? 0), 0);
   const unrealised = d.unrealisedProfitLoss ?? holdings.reduce((n, h) => n + (h.pl ?? 0), 0);
@@ -109,12 +111,13 @@ export function portfolio(db: DB, accountId?: number) {
       unrealisedPct: invested ? unrealised / invested : null,
       realised: d.realisedProfitLoss ?? null,
       cash: { total: d.cash ?? null, free: d.freeCash ?? null, inPies: d.cashInPies ?? null, reserved: d.cashReserved ?? null },
-      netDeposited: deposited - withdrawn,
+      netDeposited: putIn,
+      contributionSource: c.source,
       deposited,
       withdrawn,
       firstDeposit,
       // Value against everything you've put in, net of withdrawals.
-      gainOnDeposits: value - (deposited - withdrawn),
+      gainOnDeposits: value - putIn,
     },
     holdings,
     pies: pies.map((p) => ({
@@ -194,17 +197,11 @@ function fmtQty(q: number) {
   return q >= 100 ? q.toFixed(0) : q >= 1 ? q.toFixed(2).replace(/\.?0+$/, '') : q.toPrecision(3);
 }
 
-/** Daily value snapshots against money put in (deposits less withdrawals, from Trading 212's history). */
+/** Daily value snapshots against money put in (from Contributions). */
 export function valueHistory(db: DB, accountId: number) {
   const vals = db.prepare('SELECT date, value FROM valuations WHERE account_id = ? ORDER BY date').all(accountId) as { date: string; value: number }[];
-  const flows = db.prepare(
-    "SELECT substr(date_time, 1, 10) AS date, SUM(amount) AS amount FROM t212_cash WHERE account_id = ? AND type IN ('DEPOSIT','WITHDRAW','TRANSFER') GROUP BY 1 ORDER BY 1",
-  ).all(accountId) as { date: string; amount: number }[];
-  let i = 0; let running = 0;
-  return vals.map((v) => {
-    while (i < flows.length && flows[i].date <= v.date) running += flows[i++].amount;
-    return { date: v.date, value: v.value, contributed: flows.length ? running : null };
-  });
+  const c = contributions(db, accountId);
+  return vals.map((v) => ({ date: v.date, value: v.value, contributed: c.putIn(v.date) }));
 }
 
 /** One holding: its numbers plus every order and dividend for it. */

@@ -278,7 +278,7 @@ function InvestmentModal({ account, onClose }: { account: Account; onClose: () =
       <div className="form">
         <div className="stats stats-3">
           <Stat label="Value" value={<Money value={account.balance} />} sub={account.valuationDate ? `as of ${shortDate(account.valuationDate)}` : 'No valuation yet'} />
-          <Stat label="Money put in" value={<Money value={account.contributed ?? 0} />} />
+          <Stat label="Money put in" value={<Money value={account.contributed ?? 0} />} sub={account.contributionSource === 'trading212' ? 'from Trading 212' : 'from your bank transfers'} />
           <Stat label="Growth" value={<Money value={account.growth ?? 0} sign />} tone={(account.growth ?? 0) >= 0 ? 'good' : 'bad'}
             sub={account.contributed && account.growth != null ? pct(account.growth / account.contributed, 1) : undefined} />
         </div>

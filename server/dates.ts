@@ -66,3 +66,11 @@ export function parseBankDate(input: string, format: 'DMY' | 'YMD' | 'MDY' = 'DM
     return isIsoDate(iso) ? iso : null;
   }
 }
+
+const UK_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' });
+/** The UK calendar date of a timestamp ("2026-04-05T23:30:00Z" is 6 April in summer time). Plain dates pass through. */
+export function ukDate(dateTime: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateTime)) return dateTime;
+  const t = Date.parse(/[zZ]|[+-]\d{2}:?\d{2}$/.test(dateTime) ? dateTime : `${dateTime}Z`);
+  return Number.isNaN(t) ? dateTime.slice(0, 10) : UK_DATE.format(t);
+}

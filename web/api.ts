@@ -3,7 +3,7 @@ export interface Account {
   anchorBalance: number; anchorDate: string; colour: string; archived: boolean; sortOrder: number;
   isLiability: boolean; balance: number; transactionCount: number; lastActivity: string | null;
   wrapper: string | null; syncProvider: string | null; lastSyncedAt: string | null; syncError: string | null;
-  contributed: number | null; valuationDate: string | null; growth: number | null;
+  contributed: number | null; contributionSource: 'trading212' | 'bank' | null; valuationDate: string | null; growth: number | null;
 }
 export interface Category {
   id: number; name: string; kind: 'expense' | 'income'; parentId: number | null; colour: string; icon: string | null;

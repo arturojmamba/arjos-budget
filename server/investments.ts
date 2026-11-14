@@ -10,6 +10,7 @@
 import { type DB, tx } from './db.ts';
 import { ValidationError, assertPence, parseMoney } from './money.ts';
 import { isIsoDate, todayIso } from './dates.ts';
+import { contributions } from './contributions.ts';
 
 /** Overall annual ISA allowance (all ISA types combined). */
 export const ISA_ALLOWANCE = 2_000_000;
@@ -32,21 +33,14 @@ export function deleteValuation(db: DB, accountId: number, date: string) {
   db.prepare('DELETE FROM valuations WHERE account_id = ? AND date = ?').run(accountId, date);
 }
 
-/** Value and contributions over time, for the chart. */
+/** Value and money put in over time, for the chart. */
 export function investmentHistory(db: DB, accountId: number) {
   const vals = db.prepare('SELECT date, value, source, details FROM valuations WHERE account_id = ? ORDER BY date').all(accountId) as any[];
-  const acc = db.prepare('SELECT anchor_balance, anchor_date FROM accounts WHERE id = ?').get(accountId) as { anchor_balance: number; anchor_date: string };
-  const contributedAt = (date: string) => {
-    const r = db.prepare(
-      `SELECT IFNULL(SUM(CASE WHEN t.date > ?2 AND t.date <= ?1 THEN p.amount WHEN t.date > ?1 AND t.date <= ?2 THEN -p.amount ELSE 0 END), 0) AS n
-       FROM postings p JOIN transactions t ON t.id = p.transaction_id WHERE p.account_id = ?3`,
-    ).get(date, acc.anchor_date, accountId) as { n: number };
-    return acc.anchor_balance + r.n;
-  };
+  const c = contributions(db, accountId);
   return vals.map((v) => ({
     date: v.date,
     value: v.value,
-    contributed: contributedAt(v.date),
+    contributed: c.putIn(v.date),
     source: v.source,
     details: v.details ? JSON.parse(v.details) : null,
   }));
@@ -57,32 +51,6 @@ export function taxYear(date: string): { start: string; end: string; label: stri
   const y = Number(date.slice(0, 4));
   const startYear = date >= `${y}-04-06` ? y : y - 1;
   return { start: `${startYear}-04-06`, end: `${startYear + 1}-04-05`, label: `${startYear}/${String(startYear + 1).slice(2)}` };
-}
-
-/**
- * How much of this tax year's ISA allowance you've used: money paid into ISA
- * accounts from your other accounts since 6 April. Growth doesn't count.
- */
-export function isaAllowance(db: DB, date = todayIso()) {
-  const ty = taxYear(date);
-  const rows = db.prepare(
-    `SELECT a.id, a.name,
-            (SELECT IFNULL(SUM(p.amount), 0) FROM postings p JOIN transactions t ON t.id = p.transaction_id
-              WHERE p.account_id = a.id AND p.amount > 0 AND t.kind = 'transfer' AND t.date BETWEEN ?1 AND ?2) AS paid_in,
-            (SELECT IFNULL(SUM(-p.amount), 0) FROM postings p JOIN transactions t ON t.id = p.transaction_id
-              WHERE p.account_id = a.id AND p.amount < 0 AND t.kind = 'transfer' AND t.date BETWEEN ?1 AND ?2) AS withdrawn
-     FROM accounts a WHERE a.wrapper = 'isa' AND a.archived = 0`,
-  ).all(ty.start, ty.end) as { id: number; name: string; paid_in: number; withdrawn: number }[];
-  const used = rows.reduce((s, r) => s + r.paid_in, 0);
-  return {
-    taxYear: ty.label,
-    start: ty.start,
-    end: ty.end,
-    allowance: ISA_ALLOWANCE,
-    used,
-    remaining: Math.max(0, ISA_ALLOWANCE - used),
-    accounts: rows.map((r) => ({ id: r.id, name: r.name, paidIn: r.paid_in, withdrawn: r.withdrawn })),
-  };
 }
 
 // ---------------------------------------------------------------------------

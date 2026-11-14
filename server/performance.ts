@@ -12,6 +12,7 @@
 import { type DB } from './db.ts';
 import { daysBetween, todayIso } from './dates.ts';
 import { syncedAccounts } from './investments.ts';
+import { contributions } from './contributions.ts';
 import { symbolOf } from './investing.ts';
 
 export interface Flow { date: string; amount: number } // + into the account, − out of it
@@ -69,9 +70,7 @@ export function performance(db: DB, today = todayIso()) {
   const accountId = syncedAccounts(db)[0];
   if (!accountId) return { available: false as const, reason: 'Turn on Trading 212 sync for your ISA to see performance.' };
   const acc = db.prepare('SELECT name FROM accounts WHERE id = ?').get(accountId) as { name: string };
-  const flows = (db.prepare(
-    "SELECT substr(date_time, 1, 10) AS date, amount FROM t212_cash WHERE account_id = ? AND type IN ('DEPOSIT','WITHDRAW','TRANSFER') ORDER BY date_time",
-  ).all(accountId) as unknown as Flow[]);
+  const flows: Flow[] = contributions(db, accountId).flows().map((f) => ({ date: f.date, amount: f.amount }));
   const flowsUsed = startFrom(flows);
   const latest = db.prepare('SELECT date, value, details FROM valuations WHERE account_id = ? ORDER BY date DESC LIMIT 1').get(accountId) as { date: string; value: number; details: string | null } | undefined;
   if (!flows.length || !latest) return { available: false as const, reason: 'Sync with Trading 212 first: performance needs your deposit history and a current value.' };

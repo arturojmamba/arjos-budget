@@ -33,6 +33,7 @@ import { resetTrading212, startSync, syncStatus, syncTrading212Full } from './t2
 import { saveShares } from './shares.ts';
 import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
+import { setEarlierYearTransfer } from './contributions.ts';
 import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
 import { notifySettings, updateNotifySettings } from './notify.ts';
@@ -442,6 +443,11 @@ route('GET', '/api/t212/status', ({ db }) => syncStatus(db, trading212Config()))
 route('POST', '/api/t212/sync', ({ db, body }) => { startSync(db, trading212Config(), {}, { force: body?.force === true }); return { ok: true }; });
 route('GET', '/api/isa', ({ db }) => isaAllowanceSummary(db));
 route('GET', '/api/isa/details', ({ db }) => isaStatus(db));
+route('POST', '/api/isa/earlier-year', ({ db, body }) => {
+  if (typeof body?.reference !== 'string' || !body.reference) throw new ValidationError('Which transfer?');
+  setEarlierYearTransfer(db, body.reference, body.on === true);
+  return isaStatus(db);
+});
 route('GET', '/api/investing/performance', ({ db }) => performance(db));
 route('GET', '/api/imports', ({ db }) => listImports(db));
 const rng = (q: URLSearchParams, a = 'from', b = 'to') => ({ from: q.get(a) ?? '', to: q.get(b) ?? '' });

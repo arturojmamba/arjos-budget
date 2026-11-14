@@ -3,6 +3,17 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.13.0",
+    "date": "2026-11-14",
+    "changes": [
+      "Money put in comes from one place: Accounts, its chart, Investing, Performance and the ISA allowance always agree",
+      "Each Money put in figure says where it comes from (Trading 212, or your bank transfers)",
+      "A failed Trading 212 sync no longer switches your ISA allowance to bank transfers",
+      "Trading 212 deposits just after midnight now land on the right UK day and tax year",
+      "ISA allowance: mark a transfer in from another provider as From earlier years so it doesn't use this year's allowance"
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-11-14",
     "changes": [
