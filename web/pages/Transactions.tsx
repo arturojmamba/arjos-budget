@@ -29,6 +29,9 @@ export function Transactions({ params }: { params: URLSearchParams }) {
     budgetId: params.get('budgetId') ? Number(params.get('budgetId')) : null,
     from: params.get('from') ?? '',
     to: params.get('to') ?? '',
+    // From Overview's This month: the month a transaction counts towards, and which bill links to include.
+    period: params.get('period') ?? '',
+    linked: params.get('linked') ?? '',
   };
   const page = Math.max(1, Number(params.get('page')) || 1);
   // Changing any filter goes back to the first page.
@@ -51,7 +54,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
 
   const [items, setItems] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
-  const [totals, setTotals] = useState({ in: 0, out: 0 });
+  const [totals, setTotals] = useState({ in: 0, out: 0, moved: 0 });
   const [byCat, setByCat] = useState<{ categoryId: number | null; name: string; colour: string; amount: number }[]>([]);
   const [byMonth, setByMonth] = useState<MonthTotals[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +67,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
   useEffect(() => {
     let live = true;
     setLoading(true);
-    api.get<{ items: Transaction[]; total: number; totals: { in: number; out: number }; byCategory: typeof byCat; byMonth: MonthTotals[] }>(`/api/transactions${query}`).then((r) => {
+    api.get<{ items: Transaction[]; total: number; totals: { in: number; out: number; moved: number }; byCategory: typeof byCat; byMonth: MonthTotals[] }>(`/api/transactions${query}`).then((r) => {
       if (!live) return;
       setItems(r.items);
       setTotal(r.total);
@@ -113,7 +116,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
     refresh();
   }
 
-  const filtered = !!(f.month !== meta.currentMonth || f.accountId || f.categoryId || f.kind || f.search || f.merchant || f.uncategorised || f.budgetId || f.from);
+  const filtered = !!(f.month !== meta.currentMonth || f.accountId || f.categoryId || f.kind || f.search || f.merchant || f.uncategorised || f.budgetId || f.from || f.period || f.linked);
   const catName = categories.find((c) => c.id === f.categoryId)?.name;
   const budgetName = useBudgetName(f.budgetId);
 
@@ -140,6 +143,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
         </select>
       </div>
 
+      {(f.period || f.linked) && <PlanFilterNote f={f} onClear={() => setParams('/transactions', {})} />}
       <div className="list-summary">
         <label className="check select-page" title="Select everything on this page">
           <input type="checkbox" checked={allOnPageSelected} onChange={() => setSelected(allOnPageSelected ? new Set() : new Set(items.map((t) => t.id)))} disabled={items.length === 0} />
@@ -229,6 +233,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
             <div><span className="muted small">In</span><Money value={totals.in} className="amt-in" /></div>
             <div><span className="muted small">Out</span><Money value={totals.out} /></div>
             <div><span className="muted small">Net</span><Money value={totals.in - totals.out} /></div>
+            {f.linked === 'debts' && <div><span className="muted small">Paid towards debts</span><Money value={totals.moved} /></div>}
             {byMonth.some((m) => m.saved !== 0) && <div><span className="muted small">Saved</span><Money value={byMonth.reduce((t, m) => t + m.saved, 0)} className="amt-saved" /></div>}
           </div>
           {byCat.length === 0 ? <p className="muted small">No spending in this view.</p> : (
@@ -362,5 +367,20 @@ function Pager({ page, pages, onPage, first, last, total, pageSize, onPageSize }
         </span>
       )}
     </nav>
+  );
+}
+
+/** Shown when Overview's This month opened this view: says exactly which transactions make up the figure. */
+function PlanFilterNote({ f, onClear }: { f: { period: string; linked: string; kind: string }; onClear: () => void }) {
+  const what = f.linked === 'debts' ? 'Debt repayments paid'
+    : f.linked === 'bills' ? 'Bills and subscriptions paid'
+    : f.kind === 'expense' && f.linked === 'not-bills' ? 'Everyday spending: all spending except bills and subscriptions linked in Bills and income'
+    : f.kind === 'saving' ? 'Savings: new money into savings and investments, less anything taken back out. Moves between them don\'t count'
+    : f.kind === 'income' ? 'Income'
+    : 'This month';
+  return (
+    <p className="hint-box plan-note"><Icon name="info" size={16} />
+      <span><strong>{what}</strong>{f.period ? <>, counted towards {monthLabel(f.period)}</> : null}. These add up to the figure on Overview. <button className="link-btn" onClick={onClear}>Clear</button></span>
+    </p>
   );
 }

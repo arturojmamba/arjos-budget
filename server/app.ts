@@ -214,6 +214,8 @@ route('GET', '/api/transactions', ({ db, query }) =>
     search: query.get('search') || undefined,
     merchant: query.get('merchant') || undefined,
     uncategorised: query.get('uncategorised') === '1',
+    period: /^\d{4}-\d{2}$/.test(query.get('period') ?? '') ? query.get('period')! : undefined,
+    linked: (['bills', 'not-bills', 'debts'] as const).find((x) => x === query.get('linked')),
     limit: query.get('limit') === 'all' ? 100000 : int(query.get('limit')),
     offset: int(query.get('offset')),
   }),

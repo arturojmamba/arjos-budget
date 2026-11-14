@@ -8,13 +8,14 @@
  *     twice; a saving is done when new money arrives in its account (from an everyday account,
  *     not moved from another savings account).
  *   - Debt repayments are their own series.
- *   - The window is the funded month; money moved just after the payday that funds it counts.
+ *   - The window is the calendar month for everything, the same as Transactions, Budgets and Reports
+ *     (income counts towards the month it funds, as it always has).
  *   - Each bill knows which budget covers it (Payday counts it inside that budget).
  */
 import { type DB } from './db.ts';
 import { addDays, addMonths, daysInMonth, todayIso } from './dates.ts';
 import { occurrences, monthlyEquivalent, type Occurrence, type RecurringType, type Frequency } from './recurring.ts';
-import { monthTotals, SAVINGS_TYPES } from './queries.ts';
+import { monthTotals, savedIn, SAVINGS_TYPES } from './queries.ts';
 
 const SAV = SAVINGS_TYPES.map((t) => `'${t}'`).join(',');
 import { isLiability } from './ledger.ts';
@@ -63,19 +64,6 @@ export function movedInto(db: DB, accountId: number, from: string, to: string) {
   ).get(accountId, from, to) as { amount: number; last: string | null };
 }
 
-/** When money for this funded month moves: from just before the payday that funds it, to just before the next one. */
-export function fundingWindow(db: DB, month: string): { from: string; to: string } {
-  const first = `${month}-01`;
-  const last = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
-  const pay = yourPay(db);
-  if (!pay) return { from: first, to: last };
-  const before = paydayIn(addMonths(month, -1), pay);
-  const inMonth = paydayIn(month, pay);
-  // From the day before the payday that funds it (pay sometimes lands a day early) to two days before the next.
-  const from = fundedMonth(db, before) === month ? addDays(before, -1) : first;
-  const to = fundedMonth(db, inMonth) !== month ? addDays(inMonth, -2) : last;
-  return { from, to };
-}
 
 const series = (items: PlanItem[]): PlanSeries => {
   const planned = items.reduce((n, i) => n + i.amount, 0);
@@ -127,8 +115,8 @@ export function plan(db: DB, month: string, today = todayIso()) {
     ...savingOcc.map((o) => { const r = rec.get(o.recurringId); return { ...base(o), key: `saving:${o.recurringId}:${o.dueDate}`, accountId: r?.transfer_account_id ?? null, accountName: r?.transfer_name ?? o.accountName, done: 0 }; }),
     ...goals.map((g: any): PlanItem => ({ key: `goal:${g.id}`, name: g.name, icon: g.icon, date: null, amount: g.monthlyTarget, done: 0, paid: false, recurringId: null, goalId: g.id, accountId: g.account.id, accountName: g.account.name, from: null, to: g.account.name, coveredBy: null })),
   ];
-  // Done when it arrives: share what reached each account across that account's savings, in order.
-  const win = fundingWindow(db, month);
+  // Done when new money arrives in the calendar month: share it across each account's savings, in order.
+  const win = { from: first, to: last };
   const arrived = new Map<number, number>();
   for (const s of savingItems) {
     if (s.accountId == null) continue;
@@ -139,6 +127,8 @@ export function plan(db: DB, month: string, today = todayIso()) {
     arrived.set(s.accountId, left - s.done);
   }
   const savings = series(savingItems);
+  // What you actually saved this month, the same figure as Transactions and Reports (new money in, less any taken back out).
+  const saved = savedIn(db, month);
 
   // Income: expected pay plus anything unplanned that arrived.
   const incomeExpected = income.reduce((n, o) => n + gross(o), 0);
@@ -164,11 +154,12 @@ export function plan(db: DB, month: string, today = todayIso()) {
   ).get(month) as { n: number }).n;
   const everyday = spending - billSpending;
 
-  const committed = bills.planned + savings.planned + debts.planned;
+  // Saving more than planned still leaves your current account, so it counts against Free to spend.
+  const committed = bills.planned + Math.max(savings.planned, saved) + debts.planned;
   return {
     month,
     income: { planned: totalIncome, expected: incomeExpected, received: incomeReceived + unplannedIncome, extra: aboveUsual + Math.max(0, bonusUnplanned) },
-    bills, savings, debts,
+    bills, savings: { ...savings, saved }, debts,
     spending: { everyday },
     committed,
     committedShare: totalIncome > 0 ? committed / totalIncome : null,
@@ -205,7 +196,7 @@ export function monthPlan(db: DB, month: string, today = todayIso()) {
     billsPaid: p.bills.done,
     billsRemaining: p.bills.remaining,
     savingsTotal: p.savings.planned,
-    savingsDone: p.savings.done,
+    savingsDone: p.savings.saved,
     debtTotal: p.debts.planned,
     debtDone: p.debts.done,
     committed: p.committed,

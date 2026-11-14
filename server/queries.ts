@@ -1,6 +1,6 @@
 import type { DB } from './db.ts';
 import { contributions, type ContributionSource } from './contributions.ts';
-import { isLiability } from './ledger.ts';
+import { isLiability, LIABILITY_TYPES } from './ledger.ts';
 import { addMonths, monthOf, todayIso, daysInMonth } from './dates.ts';
 import { parseMoney } from './money.ts';
 import { merchantKey } from './merchant.ts';
@@ -150,6 +150,10 @@ export interface TransactionFilters {
   /** A place, as Reports names it (see merchantKey): matches every description that cleans up to it. */
   merchant?: string;
   uncategorised?: boolean;
+  /** The month a transaction counts towards (income can count towards the next month), as the Plan counts it. */
+  period?: string;
+  /** Payments linked to Bills and income: 'bills' (bills and subscriptions), 'not-bills' (everything else), 'debts' (debt repayments). */
+  linked?: 'bills' | 'not-bills' | 'debts';
   limit?: number;
   offset?: number;
 }
@@ -198,7 +202,7 @@ export function savedIn(db: DB, month: string): number {
 }
 
 export function listTransactions(db: DB, f: TransactionFilters): {
-  items: TransactionView[]; total: number; totals: { in: number; out: number };
+  items: TransactionView[]; total: number; totals: { in: number; out: number; moved: number };
   byCategory: { categoryId: number | null; name: string; colour: string; amount: number }[];
   byMonth: MonthGroupTotals[];
 } {
@@ -210,6 +214,12 @@ export function listTransactions(db: DB, f: TransactionFilters): {
   }
   if (f.from) { where.push('t.date >= ?'); params.push(f.from); }
   if (f.to) { where.push('t.date <= ?'); params.push(f.to); }
+  if (f.period) { where.push('t.period = ?'); params.push(f.period); }
+  const BILL_LINK = "EXISTS (SELECT 1 FROM recurring_payments rp JOIN recurring r ON r.id = rp.recurring_id WHERE rp.transaction_id = t.id AND r.type IN ('bill','subscription'))";
+  if (f.linked === 'bills') where.push(BILL_LINK);
+  if (f.linked === 'not-bills') where.push(`NOT ${BILL_LINK}`);
+  if (f.linked === 'debts') where.push(`EXISTS (SELECT 1 FROM recurring_payments rp JOIN recurring r ON r.id = rp.recurring_id JOIN accounts ta ON ta.id = r.transfer_account_id
+    WHERE rp.transaction_id = t.id AND r.type = 'saving' AND ta.type IN (${LIABILITY_TYPES.map((x) => `'${x}'`).join(',')}))`);
   if (f.kind === 'saving') where.push(`t.kind = 'transfer' AND ${SAVED_SQL} != 0`);
   else if (f.kind) { where.push('t.kind = ?'); params.push(f.kind); }
   if (f.accountId) {
@@ -253,10 +263,11 @@ export function listTransactions(db: DB, f: TransactionFilters): {
   const totalsRow = db
     .prepare(
       `SELECT IFNULL(SUM(CASE WHEN t.kind = 'income' THEN p.amount ELSE 0 END), 0) AS inn,
-              IFNULL(SUM(CASE WHEN t.kind = 'expense' THEN -p.amount ELSE 0 END), 0) AS outt
+              IFNULL(SUM(CASE WHEN t.kind = 'expense' THEN -p.amount ELSE 0 END), 0) AS outt,
+              IFNULL(SUM(CASE WHEN t.kind = 'transfer' AND p.amount > 0 THEN p.amount ELSE 0 END), 0) AS moved
        FROM transactions t JOIN postings p ON p.transaction_id = t.id ${whereSql}`,
     )
-    .get(...params) as { inn: number; outt: number };
+    .get(...params) as { inn: number; outt: number; moved: number };
 
   // Spending by top-level category for the filtered set (side panel).
   const byCategory = (db.prepare(
@@ -288,7 +299,7 @@ export function listTransactions(db: DB, f: TransactionFilters): {
   const txns = db
     .prepare(`SELECT t.* FROM transactions t ${whereSql} ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?`)
     .all(...params, limit, offset) as any[];
-  return { items: hydrate(db, txns), total, totals: { in: totalsRow.inn, out: totalsRow.outt }, byCategory, byMonth };
+  return { items: hydrate(db, txns), total, totals: { in: totalsRow.inn, out: totalsRow.outt, moved: totalsRow.moved }, byCategory, byMonth };
 }
 
 export function getTransaction(db: DB, id: number): TransactionView | null {

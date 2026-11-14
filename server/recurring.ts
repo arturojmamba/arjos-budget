@@ -210,7 +210,7 @@ function matchesPattern(r: RecurringRow, c: Candidate): boolean {
   return desc.includes(pattern) || (norm !== '' && c.merchant.toLowerCase().includes(norm));
 }
 
-function candidates(db: DB, r: RecurringRow, due: string): Candidate[] {
+function candidates(db: DB, r: RecurringRow, due: string, anyAccount = false): Candidate[] {
   const from = addDays(due, -MATCH_BEFORE);
   const to = addDays(due, MATCH_AFTER);
   const linked = 'NOT EXISTS (SELECT 1 FROM recurring_payments rp WHERE rp.transaction_id = t.id)';
@@ -228,9 +228,9 @@ function candidates(db: DB, r: RecurringRow, due: string): Candidate[] {
   return db.prepare(
     `SELECT t.id, t.date, t.description, t.merchant, ABS(SUM(p.amount)) AS amount
      FROM transactions t JOIN postings p ON p.transaction_id = t.id
-     WHERE t.kind = ? AND p.account_id = ? AND p.amount ${sign} AND t.date BETWEEN ? AND ? AND ${linked}
+     WHERE t.kind = ? AND (p.account_id = ? OR ?) AND p.amount ${sign} AND t.date BETWEEN ? AND ? AND ${linked}
      GROUP BY t.id`,
-  ).all(kind, r.account_id, from, to) as unknown as Candidate[];
+  ).all(kind, r.account_id, anyAccount ? 1 : 0, from, to) as unknown as Candidate[];
 }
 
 /**
@@ -248,9 +248,13 @@ export function autoMatch(db: DB, onlyId?: number) {
       // dueDates() enforces the start itself; look back a month so a last-working-day date before the picked day is included.
       const earliest = addDays(r.start_date, -31);
       const from = earliest > addDays(today, -400) ? earliest : addDays(today, -400);
-      const done = new Set((db.prepare('SELECT due_date FROM recurring_payments WHERE recurring_id = ?').all(r.id) as { due_date: string }[]).map((x) => x.due_date));
+      const rows = db.prepare('SELECT due_date, status, transaction_id FROM recurring_payments WHERE recurring_id = ?').all(r.id) as { due_date: string; status: string; transaction_id: number | null }[];
+      const done = new Set(rows.map((x) => x.due_date));
+      // Marked paid by hand, with no transaction: link the matching one once it's imported, so it isn't
+      // counted twice (once as a paid bill, again as everyday spending).
+      const handMarked = new Set(rows.filter((x) => x.status === 'paid' && x.transaction_id == null).map((x) => x.due_date));
       for (const due of dueDates(r, from, addDays(today, MATCH_BEFORE))) {
-        if (done.has(due)) continue;
+        if (done.has(due) && !handMarked.has(due)) continue;
         const expected = expectedAmount(db, r.id, due) ?? r.amount;
         const list = candidates(db, r, due)
           .filter((c) => (r.type === 'saving' && !r.match_pattern) || matchesPattern(r, c))
@@ -261,9 +265,21 @@ export function autoMatch(db: DB, onlyId?: number) {
             : Math.abs(c.amount - expected) <= Math.max(expected * 0.5, 100)))
           .sort((a, b) => Math.abs(daysBetween(due, a.date)) - Math.abs(daysBetween(due, b.date)) || Math.abs(a.amount - expected) - Math.abs(b.amount - expected));
         const best = list[0];
-        if (!best) continue;
+        if (!best && !handMarked.has(due)) continue;
+        if (handMarked.has(due)) {
+          // Marked paid by hand: link it, even if it was paid from another account than the bill is set up on,
+          // as long as the name and the exact amount match.
+          const r0 = db.prepare('SELECT amount FROM recurring_payments WHERE recurring_id = ? AND due_date = ?').get(r.id, due) as { amount: number | null };
+          const exact = (best && best.amount === (r0.amount ?? expected)) ? best
+            : candidates(db, r, due, true).filter((c) => matchesPattern(r, c) && c.amount === (r0.amount ?? expected))
+              .sort((a, b) => Math.abs(daysBetween(due, a.date)) - Math.abs(daysBetween(due, b.date)))[0];
+          if (!exact) continue;
+          db.prepare('UPDATE recurring_payments SET transaction_id = ?, amount = ?, paid_date = ? WHERE recurring_id = ? AND due_date = ?')
+            .run(exact.id, exact.amount, exact.date, r.id, due);
+          continue;
+        }
         db.prepare("INSERT INTO recurring_payments (recurring_id, due_date, status, transaction_id, amount, paid_date) VALUES (?, ?, 'paid', ?, ?, ?)")
-          .run(r.id, due, best.id, best.amount, best.date);
+          .run(r.id, due, best!.id, best!.amount, best!.date);
       }
       syncAmountFromPayments(db, r);
     });

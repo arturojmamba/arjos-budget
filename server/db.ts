@@ -491,6 +491,13 @@ export const MIGRATIONS: string[] = [
   UPDATE settings SET value = replace(value, '"accent":"#ff5b45"', '"accent":"#d9c08e"') WHERE key = 'appearance';
   UPDATE settings SET value = replace(value, '"appName":"Ledger"', '"appName":""') WHERE key = 'profile';
   `,
+  // v16 — "Debt Repayment" (money given back to friends and family) read like the Plan's "Debt repayments",
+  // which are tracked loans and cards. Renamed, at your request, to say what it is.
+  `
+  UPDATE categories SET name = 'Paying people back'
+   WHERE name = 'Debt Repayment' AND kind = 'expense'
+     AND NOT EXISTS (SELECT 1 FROM categories c2 WHERE c2.name = 'Paying people back' AND c2.kind = 'expense');
+  `,
 ];
 
 export function openDb(file: string): DB {

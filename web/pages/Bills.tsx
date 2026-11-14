@@ -191,28 +191,37 @@ function DueList({ upcoming, resetKey, render }: { upcoming: Occurrence[]; reset
 
 export function PlanBreakdown({ plan }: { plan: Plan }) {
   const income = Math.max(plan.incomeExpected, 1);
-  const parts = [
-    { label: 'Bills and subscriptions', value: plan.billsTotal, colour: SERIES.bills.colour, sub: `${money(plan.billsPaid, { compact: true })} paid` },
-    { label: 'Savings', value: plan.savingsTotal, colour: SERIES.savings.colour, sub: `${money(plan.savingsDone, { compact: true })} moved` },
-    ...(plan.debtTotal > 0 ? [{ label: 'Debt repayments', value: plan.debtTotal, colour: SERIES.debts.colour, sub: `${money(plan.debtDone, { compact: true })} paid` }] : []),
-    { label: 'Everyday spending so far', value: Math.max(0, plan.otherSpending), colour: SERIES.spending.colour },
+  // Each figure opens Transactions with exactly the transactions behind it (same month, same rules).
+  const tx = (q: Record<string, string>) => `#/transactions${qs({ month: 'all', period: plan.month, ...q })}`;
+  const parts: { label: string; value: number; colour: string; sub?: string; href: string; title: string }[] = [
+    { label: 'Bills and subscriptions', value: plan.billsTotal, colour: SERIES.bills.colour, sub: `${money(plan.billsPaid, { compact: true })} paid`,
+      href: tx({ linked: 'bills' }), title: 'See the bill payments so far. Bills and income shows what\'s still due.' },
+    { label: 'Savings', value: plan.savingsTotal, colour: SERIES.savings.colour, sub: `${money(plan.savingsDone, { compact: true })} saved`,
+      href: tx({ kind: 'saving' }), title: 'Planned from your goals and regular savings. See the new money saved this month.' },
+    ...(plan.debtTotal > 0 ? [{ label: 'Debt repayments', value: plan.debtTotal, colour: SERIES.debts.colour, sub: `${money(plan.debtDone, { compact: true })} paid`,
+      href: tx({ linked: 'debts' }), title: 'See the debt repayments paid so far' }] : []),
+    { label: 'Everyday spending so far', value: Math.max(0, plan.otherSpending), colour: SERIES.spending.colour,
+      href: tx({ kind: 'expense', linked: 'not-bills' }), title: 'All spending except bills and subscriptions linked in Bills and income' },
   ];
   const free = plan.freeToSpend;
+  const savingsCounted = Math.max(plan.savingsTotal, plan.savingsDone);
   return (
     <div className="plan">
-      <div className="plan-head">
+      <a className="plan-head plan-link" href={tx({ kind: 'income' })} title="See the income counted towards this month">
         <span className="muted small">Income this month</span>
         <Money value={plan.incomeExpected} className="strong" />
-      </div>
+      </a>
       <div className="plan-bar" aria-hidden="true">
         {parts.map((p) => <span key={p.label} style={{ width: `${Math.min(100, (p.value / income) * 100)}%`, background: p.colour }} />)}
       </div>
       <ul className="plan-list">
         {parts.map((p) => (
-          <li key={p.label}><i style={{ background: p.colour }} /><span className="grow">{p.label}{p.sub && <span className="muted small plan-sub">{p.sub}</span>}</span><Money value={p.value} /></li>
+          <li key={p.label}><a className="plan-link" href={p.href} title={p.title}><i style={{ background: p.colour }} /><span className="grow">{p.label}{p.sub && <span className="muted small plan-sub">{p.sub}</span>}</span><Money value={p.value} /><Icon name="chevron-right" size={14} className="plan-chev" /></a></li>
         ))}
-        <li className="plan-free"><i style={{ background: free >= 0 ? 'var(--good)' : 'var(--bad)' }} /><span className="grow"><strong>{privateLabel(free >= 0, 'Free to spend', 'Over budget', 'After bills and spending')}</strong></span><Money value={Math.abs(free)} className={free >= 0 ? 'tone-good strong' : 'tone-bad strong'} /></li>
+        <li className="plan-free" title={`Income ${money(plan.incomeExpected)} − bills ${money(plan.billsTotal)} − savings ${money(savingsCounted)} − debts ${money(plan.debtTotal)} − everyday spending ${money(Math.max(0, plan.otherSpending))}`}>
+          <i style={{ background: free >= 0 ? 'var(--good)' : 'var(--bad)' }} /><span className="grow"><strong>{privateLabel(free >= 0, 'Free to spend', 'Over budget', 'After bills and spending')}</strong></span><Money value={Math.abs(free)} className={free >= 0 ? 'tone-good strong' : 'tone-bad strong'} /></li>
       </ul>
+      <p className="muted small plan-how">Free to spend is income, less bills, savings (or what you saved, if more), debt repayments and everyday spending. Click any figure to see the transactions behind it.</p>
     </div>
   );
 }

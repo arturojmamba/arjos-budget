@@ -3,6 +3,17 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.16.0",
+    "date": "2026-11-14",
+    "changes": [
+      "This month uses the calendar month for everything, the same as Transactions, Budgets and Reports",
+      "Click any figure in This month to see exactly the transactions behind it; they add up to the figure",
+      "Savings shows what you actually saved this month (new money in), not progress capped at your goal amounts",
+      "A bill marked paid by hand is linked to its transaction once it's imported, even from another account, so it's never counted twice",
+      "The 'Debt Repayment' category is now 'Paying people back', so it isn't confused with your tracked debt repayments"
+    ]
+  },
+  {
     "version": "1.15.1",
     "date": "2026-11-14",
     "changes": [
