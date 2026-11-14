@@ -136,3 +136,13 @@ Cards 16px radius; inputs and insets 10px; buttons, badges and segmented control
 - **Navy band on Overview**: behind the greeting and the headline tiles, sized by `useNavyBand` to end 26px below them. Tiles inside use `#17243d`.
 - **Category icons** are line icons. Stored emoji map to icons through `iconFor` (Icon.tsx); unmapped emoji still show as emoji. Use `CatGlyph` for inline icons, `Bubble` for tinted circles.
 - **Pace rings** are Coil's signature: outer gold ring = time through the pay cycle, inner ring = share of spending money used, with the snake's head at its tip. Inner is green while behind time, amber when 10+ points ahead, red when over. Shown in the Overview hero tile and at the top of Payday. Don't use them for anything else.
+
+## Motion (1.10)
+
+Coil is used every day, so most things don't move. Motion has to have a purpose: feedback, showing where something came from, or bridging a change that would otherwise jump.
+
+- Easing: `--ease-out` (cubic-bezier(0.23, 1, 0.32, 1)) for anything entering or changing; `--ease-in-out` for things travelling across the screen. Never `ease-in`, never `transition: all`.
+- Durations: presses 120ms, value changes 250ms, dialogs 200ms, accordions 220ms. Nothing in the app over 300ms except the pace-ring draw-in (650ms, once per launch).
+- Never animate: page switches, month and pager arrows, charts, numbers, list rows, or anything opened from a keyboard shortcut (`kbd-open` makes those dialogs instant).
+- Hover effects are colour only and sit behind `@media (hover: hover) and (pointer: fine)`.
+- Reduce motion turns everything off (system setting and Settings → Appearance).

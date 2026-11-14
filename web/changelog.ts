@@ -3,6 +3,18 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.10.0",
+    "date": "2026-11-14",
+    "changes": [
+      "The pace rings draw themselves the first time you see Overview after opening Coil",
+      "Payday steps and Guide sections open smoothly",
+      "Messages slide up from the bottom and slide back down when they go",
+      "Dialogs open a little faster without the wobble, and instantly when you use a keyboard shortcut",
+      "No more grey placeholder flashing as pages load",
+      "Arrow and icon buttons press in when you click them"
+    ]
+  },
+  {
     "version": "1.9.1",
     "date": "2026-11-14",
     "changes": [

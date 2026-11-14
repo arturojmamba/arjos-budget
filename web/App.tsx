@@ -65,7 +65,7 @@ export function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [version, setVersion] = useState(0);
-  const [toasts, setToasts] = useState<{ id: number; msg: string; kind: 'ok' | 'error' }[]>([]);
+  const [toasts, setToasts] = useState<{ id: number; msg: string; kind: 'ok' | 'error'; leaving?: boolean }[]>([]);
   const [fatal, setFatal] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const pageAdd = useCurrentPageAdd();
@@ -99,6 +99,8 @@ export function App() {
   const toast = useCallback((msg: string, kind: 'ok' | 'error' = 'ok') => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, msg, kind }]);
+    // Slide out the way it came in, then go.
+    setTimeout(() => setToasts((t) => t.map((x) => (x.id === id ? { ...x, leaving: true } : x))), 3000);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
 
@@ -115,9 +117,11 @@ export function App() {
       if (pendingG && Date.now() - pendingG < 1200 && JUMP[k]) { e.preventDefault(); pendingG = 0; navigate(JUMP[k]); return; }
       pendingG = 0;
       if (k === 'g') { pendingG = Date.now(); return; }
-      if (k === 'n') { e.preventDefault(); setAdding(true); }
+      // Dialogs opened from the keyboard appear at once: shortcuts should feel instant.
+      const instant = () => { document.documentElement.classList.add('kbd-open'); setTimeout(() => document.documentElement.classList.remove('kbd-open'), 300); };
+      if (k === 'n') { e.preventDefault(); instant(); setAdding(true); }
       if (k === 'h') { e.preventDefault(); toggleHidden(); }
-      if (e.key === '?') { e.preventDefault(); setHelp(true); }
+      if (e.key === '?') { e.preventDefault(); instant(); setHelp(true); }
       if (e.key === '/') {
         e.preventDefault();
         if (!window.location.hash.startsWith('#/transactions')) navigate('/transactions');
@@ -230,7 +234,7 @@ export function App() {
         </div>
       )}
       <div className="toasts" aria-live="polite">
-        {toasts.map((t) => <div key={t.id} className={`toast toast-${t.kind}`}>{t.kind === 'ok' ? <Icon name="check" size={16} /> : <Icon name="alert" size={16} />}{t.msg}</div>)}
+        {toasts.map((t) => <div key={t.id} className={`toast toast-${t.kind} ${t.leaving ? 'leaving' : ''}`}>{t.kind === 'ok' ? <Icon name="check" size={16} /> : <Icon name="alert" size={16} />}{t.msg}</div>)}
       </div>
     </AppContext.Provider>
   );

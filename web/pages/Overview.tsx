@@ -1,4 +1,4 @@
-import { PaceRings, PaceKey, paceTone, cycleProgress, lastPayday } from '../components/PaceRings.tsx';
+import { PaceRings, PaceKey, paceTone, cycleProgress, lastPayday, useDrawOnce } from '../components/PaceRings.tsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, qs, type Summary, type Plan, type Occurrence, type MonthSpending } from '../api.ts';
 import { money, monthLabel, pct, dayMonth, relativeDay, addMonths, shortDate, privateLabel, niceName } from '../format.ts';
@@ -324,6 +324,7 @@ function FreeHero({ s, plan, payday, today }: { s: Summary; plan: Plan; payday: 
   const pot = plan.otherSpending + Math.max(0, free);
   const used = free < 0 ? 1 : pot > 0 ? plan.otherSpending / pot : 0;
   const tone = paceTone(time, used, free < 0);
+  const drawIn = useDrawOnce();
   const verdict = tone === 'bad' ? 'Over' : tone === 'warn' ? 'Spending ahead of time' : 'On track';
   const until = payday ? `until payday` : `left this month`;
   return (
@@ -341,7 +342,7 @@ function FreeHero({ s, plan, payday, today }: { s: Summary; plan: Plan; payday: 
         </p>
       </div>
       <div className="stat-hero-rings">
-        <PaceRings time={time} money={used} tone={tone} />
+        <PaceRings time={time} money={used} tone={tone} drawIn={drawIn} />
         <PaceKey time={time} money={used} />
       </div>
     </div>
