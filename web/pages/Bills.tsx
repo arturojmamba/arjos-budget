@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api, qs, type Occurrence, type Plan, type Recurring, type Suggestion } from '../api.ts';
 import { FREQUENCY_LABELS, privateLabel, addMonths, dayMonth, money, monthLabel, pct, relativeDay, shortDate } from '../format.ts';
-import { Badge, Bubble, Card, Empty, Modal, Money, Stat, useApp, useData } from '../components/ui.tsx';
+import { Badge, Bubble, Card, Empty, Modal, Money, Stat, useApp, useData, useFitRows, usePaged } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { RecurringForm, type RecurringDraft } from '../components/RecurringForm.tsx';
 
@@ -71,12 +71,11 @@ export function Bills() {
                 ? <Empty icon="calendar" title="Nothing due">Add your bills, subscriptions and salary to see what's coming.</Empty>
                 : <Empty icon="check" title="All done for this month">Nothing else is due before the end of {monthLabel(meta.currentMonth)}.</Empty>
           ) : (
-            <ul className="due-list fit-scroll">
-              {upcoming.map((o) => {
+            <DueList upcoming={upcoming} resetKey={day ?? ''} render={(o) => {
                 const dm = dayMonth(o.dueDate);
                 const done = o.status === 'paid' || o.status === 'skipped';
                 return (
-                  <li key={`${o.recurringId}-${o.dueDate}`} className={`due status-${o.status}`}>
+                  <li data-fit-row key={`${o.recurringId}-${o.dueDate}`} className={`due status-${o.status}`}>
                     <span className="due-date"><strong>{dm.day}</strong><span>{dm.month}</span></span>
                     <Bubble colour={o.categoryColour ?? TYPE_COLOUR[o.type]} icon={o.categoryIcon ?? TYPE_ICON[o.type]} size={34} />
                     <span className="grow">
@@ -90,8 +89,7 @@ export function Bills() {
                     <button className="btn btn-sm" onClick={() => setPaying(o)}>{done ? 'Change' : o.type === 'income' ? 'Received' : 'Paid'}</button>
                   </li>
                 );
-              })}
-            </ul>
+              }} />
           )}
         </Card>
 
@@ -180,6 +178,18 @@ function StatusBadge({ o }: { o: Occurrence }) {
     case 'due': return <Badge tone="warn">Due</Badge>;
     default: return <Badge tone="info">Upcoming</Badge>;
   }
+}
+
+/** The rest of the month: as many as fit beside the calendar, then arrows. */
+function DueList({ upcoming, resetKey, render }: { upcoming: Occurrence[]; resetKey: string; render: (o: Occurrence) => React.ReactNode }) {
+  const { ref, size } = useFitRows(upcoming.length, 8);
+  const { rows, pager } = usePaged(upcoming, size, resetKey);
+  return (
+    <div className="fit-fill" ref={ref}>
+      <ul className="due-list">{rows.map(render)}</ul>
+      {pager}
+    </div>
+  );
 }
 
 export function PlanBreakdown({ plan }: { plan: Plan }) {

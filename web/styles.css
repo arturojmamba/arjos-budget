@@ -238,9 +238,10 @@ textarea { resize: vertical; }
 .grid-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .grid-2-cards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .grid-main > .card, .grid-2-cards > .card { min-width: 0; }
-/* Takes the row's height from its neighbour and scrolls inside (needs a .fit-scroll child). */
+/* Takes the row's height from its neighbour; its .fit-fill list shows as many rows as fit and pages (useFitRows). */
 .fit-row { contain: size; min-height: 360px; display: flex; flex-direction: column; }
-.fit-row > .fit-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.fit-row > .fit-fill { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.fit-fill > .card-pager { margin-top: auto; }
 .welcome { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
 .welcome h2 { font-size: 18px; margin-bottom: 4px; }
 
@@ -1463,7 +1464,7 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .about-credit { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border); }
 @media (max-width: 1100px) {
   .fit-row { contain: none; min-height: 0; }
-  .fit-row > .fit-scroll { max-height: 480px; }
+  .fit-row > .fit-fill { overflow: visible; }
 }
 /* "This month" across the full width: the parts side by side. */
 .plan-wide .plan-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 24px; }
@@ -1478,3 +1479,9 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 :is(.grid-main, .grid-2-cards, .cols-2, .cols-main-side, .inv-grid, .pie-grid, .budget-rec-grid, .settings-grid) > .card > .card-pager { margin-top: auto; }
 /* A column of cards next to a taller card: the last one fills the rest, so both sides end level. */
 :is(.grid-main, .grid-2-cards, .cols-2, .cols-main-side, .inv-grid) > .stack > .card:last-child { flex: 1 1 auto; }
+/* The breakdown fits its card: tighter cells, a shorter share bar, the trend kept inside the edge. */
+.breakdown th, .breakdown td { padding-left: 8px; padding-right: 8px; }
+.breakdown th:last-child, .breakdown td:last-child { padding-right: 20px; width: 64px; }
+.breakdown .share-bar { width: 64px; }
+.breakdown td .spark-mini { display: block; width: 64px; }
+.breakdown td:nth-child(3) { white-space: nowrap; }

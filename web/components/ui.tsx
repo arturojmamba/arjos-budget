@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon.tsx';
 import { money, initials } from '../format.ts';
 import type { Account, Category, Meta } from '../api.ts';
@@ -231,4 +231,35 @@ export function usePaged<T>(list: T[], size: number, resetKey: string) {
     </nav>
   ) : null;
   return { rows, pager };
+}
+
+/**
+ * How many rows fit in a .fit-row card (one that takes its height from the card beside it), so a
+ * list fills the space and pages instead of scrolling. Put the ref on the .fit-fill element holding
+ * the list; mark a header with data-fit-head and each row with data-fit-row. When the card isn't
+ * height-bound (one column, on narrow windows) it uses `fallback`.
+ */
+export function useFitRows(total: number, fallback: number, { pagerHeight = 52, min = 3 } = {}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState(fallback);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const card = el.parentElement;
+      if (!card || !getComputedStyle(card).contain.includes('size')) { setSize(fallback); return; }
+      const head = el.querySelector<HTMLElement>('[data-fit-head]');
+      const row = el.querySelector<HTMLElement>('[data-fit-row]');
+      const rowH = row?.getBoundingClientRect().height || 52;
+      const room = el.clientHeight - (head?.getBoundingClientRect().height ?? 0) - 8;
+      // Everything fits: no pager. Otherwise leave room for the pager under the rows.
+      const next = total * rowH <= room ? Math.max(total, 1) : Math.max(min, Math.floor((room - pagerHeight) / rowH));
+      setSize((cur) => (cur === next ? cur : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [total, fallback, pagerHeight, min]);
+  return { ref, size };
 }

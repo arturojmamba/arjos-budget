@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api.ts';
 import { money, monthLabel, pct, shortDate, amountsHidden } from '../format.ts';
-import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useData, usePaged } from '../components/ui.tsx';
+import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useData, useFitRows, usePaged } from '../components/ui.tsx';
 import { IncomeSpendBars } from '../components/charts.tsx';
 import { LineChart, Spark, StackedBars, Waterfall, useHidden } from '../components/viz.tsx';
 import { Icon } from '../components/Icon.tsx';
@@ -324,7 +324,7 @@ function Explorer({ params, set }: { params: URLSearchParams; set: (x: Record<st
               </Card>
               <div className="grid-main">
                 {data.level !== 'transactions' ? (
-                  <Card pad={false} title="Breakdown" action={<span className="muted small">{data.compared ? `change vs ${shortDate(data.previous.from)} – ${shortDate(data.previous.to)}` : 'no earlier data to compare with'}</span>}>
+                  <Card pad={false} className="fit-row" title="Breakdown" action={<span className="muted small">{data.compared ? `change vs ${shortDate(data.previous.from)} – ${shortDate(data.previous.to)}` : 'no earlier data to compare with'}</span>}>
                     <BreakdownTable data={data} hidden={hidden} drill={drill} />
                   </Card>
                 ) : (
@@ -1024,25 +1024,26 @@ const BREAKDOWN_PAGE = 10;
 
 /** The breakdown table, ten rows at a time, biggest first, with arrows for the rest. */
 function BreakdownTable({ data, hidden, drill }: { data: any; hidden: Set<string>; drill: (d: any) => void }) {
-  const { rows, pager } = usePaged<any>(data.series, BREAKDOWN_PAGE, data.series.map((s: any) => s.key).join('|'));
+  const { ref, size } = useFitRows(data.series.length, BREAKDOWN_PAGE);
+  const { rows, pager } = usePaged<any>(data.series, size, data.series.map((s: any) => s.key).join('|'));
   return (
-    <>
+    <div className="fit-fill" ref={ref}>
     <table className="report-table breakdown">
-      <thead><tr><th>{data.level === 'category' ? 'Category' : data.level === 'subcategory' ? 'Subcategory' : 'Place'}</th><th className="num">Spent</th><th className="hide-sm">Share</th><th className="num hide-sm">Per month</th><th className="num">Change</th><th className="hide-sm">Trend</th></tr></thead>
+      <thead data-fit-head><tr><th>{data.level === 'category' ? 'Category' : data.level === 'subcategory' ? 'Subcategory' : 'Place'}</th><th className="num">Spent</th><th className="hide-sm">Share</th><th className="num hide-sm">Per month</th><th className="num">Change</th><th className="hide-sm">Trend</th></tr></thead>
       <tbody>
         {rows.map((s) => (
-          <tr key={s.key} className={`${s.drill ? 'clickable' : ''} ${hidden.has(s.key) ? 'off' : ''}`} onClick={() => drill(s.drill)} tabIndex={s.drill ? 0 : -1} onKeyDown={(e) => { if (e.key === 'Enter') drill(s.drill); }}>
+          <tr data-fit-row key={s.key} className={`${s.drill ? 'clickable' : ''} ${hidden.has(s.key) ? 'off' : ''}`} onClick={() => drill(s.drill)} tabIndex={s.drill ? 0 : -1} onKeyDown={(e) => { if (e.key === 'Enter') drill(s.drill); }}>
             <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} />{s.icon && <span>{s.icon}</span>}<span className="ellipsis">{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
             <td className="num strong"><Money value={s.total} /></td>
             <td className="hide-sm"><span className="share-bar"><span style={{ width: `${Math.round(s.share * 100)}%`, background: s.colour }} /></span><span className="muted small">{pct(s.share)}</span></td>
             <td className="num hide-sm"><Money value={Math.round(s.total / data.months.length)} /></td>
             <td className={`num ${changeTone(s.change)}`}>{s.prev == null ? <span className="muted">–</span> : s.prev === 0 ? <span className="muted small">new</span> : signedPct(s.change)}</td>
-            <td className="hide-sm"><Spark values={s.values} colour={s.colour} /></td>
+            <td className="hide-sm"><Spark values={s.values} colour={s.colour} width={64} /></td>
           </tr>
         ))}
       </tbody>
     </table>
       {pager}
-    </>
+    </div>
   );
 }
