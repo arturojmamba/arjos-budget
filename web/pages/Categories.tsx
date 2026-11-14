@@ -62,7 +62,7 @@ export function Categories() {
     const parents = categories.filter((c) => c.kind === kind && c.parentId === null);
     return (
       <Card title={kind === 'expense' ? 'Spending categories' : 'Income categories'} pad={false} className={kind === 'income' ? 'cat-side' : undefined}
-        action={<button className="btn btn-sm" onClick={() => setEditing({ cat: null, kind })}><Icon name="plus" size={14} /> New</button>}>
+>
         <p className="muted small cat-hint">Drag to reorder, or use the arrows. This is the order used in pickers and lists.</p>
         <ul className="cat-manage">
           {parents.map((p) => {
@@ -77,7 +77,7 @@ export function Categories() {
                   {p.archived && <Badge>Archived</Badge>}
                   {p.kind === 'expense' && looksLikeTransfer(p.name) && <span title="Payments in this category count as spending. Card repayments and moves between your own accounts should be transfers instead."><Badge tone="warn">Counts as spending</Badge></span>}
                 </span>
-                <span className="muted small">{p.transactionCount}</span>
+                <span className="muted small" title={`${p.transactionCount} transactions`} aria-label={`${p.transactionCount} transactions`}>{p.transactionCount}</span>
                 {arrows(p, parents)}
                 <button className="icon-btn" title="Add subcategory" aria-label={`Add subcategory to ${p.name}`} onClick={() => setEditing({ cat: null, kind, parentId: p.id })}><Icon name="plus" size={16} /></button>
                 <button className="icon-btn" aria-label={`Edit ${p.name}`} onClick={() => setEditing({ cat: p, kind })}><Icon name="edit" size={16} /></button>
@@ -87,7 +87,7 @@ export function Categories() {
                   <span className="drag-handle" aria-hidden="true"><Icon name="grip" size={14} strokeWidth={3} /></span>
                   {c.icon ? <CatGlyph icon={c.icon} className="sub-emoji" /> : <span className="dot" style={{ background: c.colour }} />}
                   <span className="grow">{c.name}{c.archived && <Badge>Archived</Badge>}</span>
-                  <span className="muted small">{c.transactionCount}</span>
+                  <span className="muted small" title={`${c.transactionCount} transactions`} aria-label={`${c.transactionCount} transactions`}>{c.transactionCount}</span>
                   {subs.length > 1 && arrows(c, subs)}
                   <button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setEditing({ cat: c, kind })}><Icon name="edit" size={16} /></button>
                 </li>
@@ -128,8 +128,9 @@ function CatTabs({ tab }: { tab: 'categories' | 'rules' }) {
   );
 }
 
-function CategoryForm({ cat, kind, parentId, onClose }: { cat: Category | null; kind: 'expense' | 'income'; parentId?: number | null; onClose: () => void }) {
+function CategoryForm({ cat, kind: kindIn, parentId, onClose }: { cat: Category | null; kind: 'expense' | 'income'; parentId?: number | null; onClose: () => void }) {
   const { categories, refresh, toast } = useApp();
+  const [kind, setKind] = useState<'expense' | 'income'>(kindIn);
   const parent = categories.find((c) => c.id === (cat?.parentId ?? parentId));
   const [name, setName] = useState(cat?.name ?? '');
   const [colour, setColour] = useState(cat?.colour ?? parent?.colour ?? COLOURS[0]);
@@ -190,6 +191,11 @@ function CategoryForm({ cat, kind, parentId, onClose }: { cat: Category | null; 
         </div>
       ) : (
         <form id="cat-form" className="form" onSubmit={save}>
+          {!cat && !parentId && (
+            <Field label="Type">
+              <Segmented<'expense' | 'income'> value={kind} onChange={setKind} options={[{ value: 'expense', label: 'Spending' }, { value: 'income', label: 'Income' }]} />
+            </Field>
+          )}
           <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Colour">
             <div className="swatches">
@@ -339,7 +345,7 @@ function Rules() {
                     <span className="muted small">{r.matchType === 'contains' ? 'contains' : r.matchType.replace('_', ' ')}{r.accountName ? ` · ${r.accountName} only` : ''}</span>
                   </span>
                   <span className="rule-then">
-                    {r.categoryName ? <><span className="dot" style={{ background: r.categoryColour ?? '#999' }} /> {categories.find((c) => c.id === r.categoryId)?.icon ?? ''} {r.categoryName}</>
+                    {r.categoryName ? <><span className="dot" style={{ background: r.categoryColour ?? '#94a3b8' }} /> {categories.find((c) => c.id === r.categoryId)?.icon ?? ''} {r.categoryName}</>
                       : r.transferAccountName ? <>Transfer ⇄ {r.transferAccountName}</> : <span className="muted">No category</span>}
                     {r.renameTo && <span className="muted small"> · renamed “{r.renameTo}”</span>}
                   </span>

@@ -67,7 +67,7 @@ function AccountRow({ a, child, onEdit, onInvest }: { a: Account; child?: boolea
         <button className="acct-main" onClick={onInvest}>
           <span className="acct-name">{a.name} {a.wrapper === 'isa' && <span className="tag">ISA</span>}</span>
           <span className="acct-meta">
-            {a.contributed != null && <>Paid in {money(a.contributed)} · </>}
+            {a.contributed != null && <>Money put in {money(a.contributed)} · </>}
             {a.syncProvider === 'trading212'
               ? a.syncError ? <span className="tone-bad">Sync problem: {a.syncError}</span> : a.lastSyncedAt ? <>Synced with Trading 212 {timeAgo(a.lastSyncedAt)}</> : 'Not synced yet'
               : a.valuationDate ? <>Valued {shortDate(a.valuationDate)}</> : 'No valuation yet'}
@@ -278,13 +278,13 @@ function InvestmentModal({ account, onClose }: { account: Account; onClose: () =
       <div className="form">
         <div className="stats stats-3">
           <Stat label="Value" value={<Money value={account.balance} />} sub={account.valuationDate ? `as of ${shortDate(account.valuationDate)}` : 'No valuation yet'} />
-          <Stat label="Paid in" value={<Money value={account.contributed ?? 0} />} />
+          <Stat label="Money put in" value={<Money value={account.contributed ?? 0} />} />
           <Stat label="Growth" value={<Money value={account.growth ?? 0} sign />} tone={(account.growth ?? 0) >= 0 ? 'good' : 'bad'}
             sub={account.contributed && account.growth != null ? pct(account.growth / account.contributed, 1) : undefined} />
         </div>
         {history && history.length >= 2 && (
           <div>
-            <span className="legend"><i className="lg-income" />Value <i className="lg-contrib" />Paid in</span>
+            <span className="legend"><i className="lg-income" />Value <i className="lg-contrib" />Money put in</span>
             <ValueLine points={history} />
           </div>
         )}

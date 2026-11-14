@@ -288,7 +288,7 @@ export function TxnRow({ t, accountId, onClick, selectable, selected, onSelect, 
     const mine = accountId ? t.postings.find((p) => p.accountId === accountId) : null;
     amount = mine ? mine.amount : inn.amount;
     subtitle = <>{out.accountName} <Icon name="chevron-right" size={12} /> {inn.accountName}</>;
-    bubble = <Bubble colour={inn.accountIsLiability && !amountsHidden() ? '#dc2626' : '#64748b'} icon={inn.accountIsLiability ? 'percentage' : 'transfer'} />;
+    bubble = <Bubble colour={inn.accountIsLiability && !amountsHidden() ? 'var(--bad)' : 'var(--spend)'} icon={inn.accountIsLiability ? 'percentage' : 'transfer'} />;
   } else {
     amount = t.postings.reduce((s, p) => s + p.amount, 0);
     const cat = categories.find((c) => c.id === p0.categoryId);
@@ -361,11 +361,6 @@ function Pager({ page, pages, onPage, first, last, total, pageSize, onPageSize }
           <button className="icon-btn" onClick={() => onPage(page + 1)} disabled={page >= pages} aria-label="Next page"><Icon name="chevron-right" size={16} /></button>
         </span>
       )}
-      <label className="page-size">
-        <select value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))} aria-label="Transactions per page">
-          {PAGE_SIZES.map((n) => <option key={n} value={n}>{n === 0 ? 'All' : `${n} per page`}</option>)}
-        </select>
-      </label>
     </nav>
   );
 }

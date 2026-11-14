@@ -62,7 +62,7 @@ export function Debts() {
         <Stat label="Monthly payments" value={<Money value={totals.monthlyCommitment} />}
           sub={totals.statements > 0 ? `${money(totals.minimums, { compact: true })} minimums + ${money(totals.statements, { compact: true })} cleared in full` : 'Minimum payments due'} />
         <Stat label="Paid off so far" value={<Money value={totals.paidOff} />} sub={totals.progress != null ? `${pct(totals.progress)} of what you borrowed` : 'Add original balances to track this'} />
-        <Stat label="Interest in the last year" value={<Money value={totals.interestPaidYear} />} sub="Interest and fees charged" />
+        <Stat label="Interest in the last year" value={<Money value={totals.interestPaidYear} />} sub="Interest and fees in your transactions" />
       </div>
 
       {totals.missingDetails > 0 && (
@@ -446,16 +446,16 @@ function PayoffPlan({ hasDebts }: { hasDebts: boolean }) {
             <button className="btn" onClick={apply}>Update</button>
           </div>
         </Field>
-        <Field label="Strategy">
+        {plan.debts.length > 1 && <Field label="Strategy">
           <Segmented<Strategy> value={strategy} onChange={(v) => { setStrategy(v); api.put('/api/debts/plan', { strategy: v }); }}
             options={[{ value: 'avalanche', label: 'Avalanche' }, { value: 'snowball', label: 'Snowball' }]} />
-        </Field>
+        </Field>}
       </div>
 
       {chosen.shortfall && <p className="form-error">That's less than the minimum payments. Minimums are still paid, so this is the same as minimums only.</p>}
 
       <div className="strategy-grid">
-        {cols.map((c) => {
+        {cols.filter((c) => plan.debts.length > 1 || c.key !== 'snowball').map((c) => (plan.debts.length > 1 || c.key === 'minimum' ? c : { ...c, title: 'Your plan', note: `Paying ${money(plan.monthly)} a month` })).map((c) => {
           const r = s[c.key];
           const saves = s.minimum.totalInterest - r.totalInterest;
           return (
@@ -472,7 +472,7 @@ function PayoffPlan({ hasDebts }: { hasDebts: boolean }) {
 
       <div className="cols-2" style={{ marginTop: 18 }}>
         <div>
-          <p className="field-label" style={{ marginBottom: 8 }}>Order you'll clear them ({strategy})</p>
+          <p className="field-label" style={{ marginBottom: 8 }}>{plan.debts.length > 1 ? `Order you'll clear them (${strategy})` : 'When it\'s cleared'}</p>
           <ol className="payoff-order">
             {chosen.order.map((o) => (
               <li key={o.id}><span className="grow">{o.name}</span><span className="muted small">{monthLabel(o.month)} · {o.months} month{o.months === 1 ? '' : 's'}</span></li>
@@ -481,10 +481,10 @@ function PayoffPlan({ hasDebts }: { hasDebts: boolean }) {
           </ol>
         </div>
         <div>
-          <span className="legend"><i style={{ background: 'var(--text-3)' }} />Minimums <i style={{ background: '#f59e0b' }} />Snowball <i style={{ background: 'var(--good)' }} />Avalanche</span>
+          <span className="legend"><i style={{ background: 'var(--text-3)' }} />Minimums {plan.debts.length > 1 ? <><i style={{ background: 'var(--accent-line)' }} />Snowball <i style={{ background: 'var(--good)' }} />Avalanche</> : <><i style={{ background: 'var(--good)' }} />Your plan</>}</span>
           <PayoffChart series={[
             { colour: 'var(--text-3)', points: s.minimum.series, dashed: true },
-            { colour: '#f59e0b', points: s.snowball.series },
+            { colour: 'var(--accent-line)', points: s.snowball.series },
             { colour: 'var(--good)', points: s.avalanche.series },
           ]} />
         </div>
@@ -831,15 +831,7 @@ function Timeline() {
           {after && data.monthlyNow > 0 && <span className="small">From {monthLabel(after)}, <Money value={data.monthlyNow} className="strong amt-saved" /> a month is free for savings</span>}
           {data.unscheduled.length > 0 && <span className="small tone-warn">{data.unscheduled.join(', ')} {data.unscheduled.length === 1 ? 'has' : 'have'} no repayments set. Add them on Bills and income, or give a monthly payment in Edit.</span>}
         </div>
-        <div className="tl-bars" aria-label="Debt payments by month">
-          {data.byMonth.slice(0, 12).map((m) => (
-            <div key={m.month} className="tl-bar" title={`${monthLabel(m.month)}: ${money(m.total)}`}>
-              <span style={{ height: `${(m.total / max) * 100}%` }} />
-              <i>{monthLabel(m.month, true)}</i>
-            </div>
-          ))}
-          {after && <div className="tl-bar tl-free" title="Nothing left to pay"><span style={{ height: '6%' }} /><i>{monthLabel(after, true)}</i></div>}
-        </div>
+        <LeftToPay byMonth={data.byMonth} end={data.debtFree ?? data.scheduledEnd} />
       </div>
       <ul className="tl-list">
         {data.debts.map((d) => (
@@ -855,6 +847,41 @@ function Timeline() {
         ))}
       </ul>
     </Card>
+  );
+}
+
+/** What's still to pay at the start of each month, falling to nothing on the day you're debt-free. */
+function LeftToPay({ byMonth, end }: { byMonth: { month: string; total: number }[]; end: string | null }) {
+  if (byMonth.length === 0) return null;
+  let left = byMonth.reduce((t, m) => t + m.total, 0);
+  const points = byMonth.map((m) => { const p = { month: m.month, left }; left -= m.total; return p; });
+  points.push({ month: addMonths(byMonth[byMonth.length - 1].month, 1), left: 0 });
+  const W = 600, H = 120, top = 8, bottom = 22;
+  const max = Math.max(1, points[0].left);
+  const x = (i: number) => (i / (points.length - 1)) * W;
+  const y = (v: number) => top + (1 - v / max) * (H - top - bottom);
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p.left).toFixed(1)}`).join(' ');
+  const area = `${line} L${W} ${H - bottom} L0 ${H - bottom} Z`;
+  // Label the start, each January, and the end, so the years are never ambiguous.
+  const gap = Math.max(2, Math.round(points.length * 0.12)); // keep labels apart
+  const ticks = points.map((p, i) => ({ i, p })).filter(({ i, p }) => i === 0 || i === points.length - 1 || (p.month.endsWith('-01') && i >= gap && i <= points.length - 1 - gap));
+  const label = `What's left to pay falls from ${money(points[0].left)} now to nothing${end ? ` by ${monthLabel(end.slice(0, 7))}` : ''}`;
+  return (
+    <figure className="left-to-pay" role="img" aria-label={label}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+        <path d={area} className="ltp-area" />
+        <path d={line} className="ltp-line" vectorEffect="non-scaling-stroke" />
+        <circle cx={x(points.length - 1)} cy={y(0)} r="4" className="ltp-end" />
+      </svg>
+      <div className="ltp-ticks" aria-hidden="true">
+        {ticks.map(({ i, p }) => (
+          <span key={p.month} style={{ left: `${(x(i) / W) * 100}%` }} className={i === 0 ? 'first' : i === points.length - 1 ? 'last' : ''}>
+            {i === points.length - 1 ? 'Debt-free' : monthLabel(p.month, true)} {i === points.length - 1 ? '' : p.month.slice(0, 4)}
+          </span>
+        ))}
+      </div>
+      <figcaption className="muted small">Left to pay, including interest: <Money value={points[0].left} /> now</figcaption>
+    </figure>
   );
 }
 

@@ -100,7 +100,6 @@ export function Budgets({ month }: { month: string }) {
               </div>
               <div className="row gap">
                 {suggestions && suggestions.length > 0 && <button className="btn" onClick={() => setQuickStart(true)}><Icon name="sparkles" size={16} /> Suggestions</button>}
-                <button className="btn btn-primary" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> New budget</button>
               </div>
             </div>
           </Card>
@@ -127,7 +126,9 @@ export function Budgets({ month }: { month: string }) {
 
 function BudgetCard({ b, month, isCurrent, onEdit }: { b: BudgetView; month: string; isCurrent: boolean; onEdit: () => void }) {
   const over = b.remaining < 0;
-  const tone = b.status === 'over' ? 'bad' : b.status === 'warn' ? 'warn' : 'good';
+  // Amber when it's close to the limit, or when today's pace would take it over (time against money).
+  const aheadOfTime = !!b.pace && !b.pace.onTrack && b.pace.projected > b.available;
+  const tone = b.status === 'over' ? 'bad' : b.status === 'warn' || aheadOfTime ? 'warn' : 'good';
   const periodText = b.period === 'monthly' ? (isCurrent ? 'This month' : b.current.label) : b.period === 'weekly' ? (b.pace ? `This week · ${b.current.label}` : b.current.label) : (b.pace ? `This year` : b.current.label);
   const maxHist = Math.max(1, ...b.history.map((h) => Math.max(h.spent, h.limit)));
   const linkQuery = b.period === 'monthly' ? { month } : b.period === 'weekly' ? { from: b.current.start, to: b.current.end } : {};
@@ -209,7 +210,7 @@ function Compare({ budgets }: { budgets: BudgetView[] }) {
           </tbody>
         </table>
       </div>
-      <p className="muted small" style={{ padding: '10px 20px 16px' }}>The average leaves out the current month. Red means over that month's limit.</p>
+      <p className="muted small" style={{ padding: '10px 20px 16px' }}>The average leaves out the current month. ▲ and red mean over that month's limit.</p>
     </Card>
   );
 }

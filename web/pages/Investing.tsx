@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { api } from '../api.ts';
 import { amountsHidden, money, pct, privateLabel, shortDate, timeAgo } from '../format.ts';
-import { Badge, Card, Empty, Modal, Money, Segmented, Stat, useApp, useData } from '../components/ui.tsx';
+import { Badge, Card, Empty, Modal, Money, Segmented, Stat, useApp, useData, usePaged } from '../components/ui.tsx';
 import { Donut, ValueLine } from '../components/charts.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { useT212 } from '../components/T212.tsx';
@@ -207,20 +207,7 @@ export function Investing() {
             <p className="muted small hold-foot">Returns are in pounds and include currency moves. Prices are in each share's own currency (p is pence).</p>
           </Card>
 
-          <div className="inv-grid">
-            <Card title="Recent activity" pad={false}>
-              <ul className="activity">
-                {data.activity.slice(0, 10).map((a, i) => (
-                  <li key={i}>
-                    <span className={`act-icon act-${a.kind}`}><Icon name={ACT_ICON[a.kind] ?? 'transfer'} size={15} /></span>
-                    <div className="grow"><span>{a.title}</span><span className="muted small">{shortDate(a.date)}{a.detail ? ` · ${a.detail}` : ''}</span></div>
-                    {a.amount != null && <span className={a.kind === 'withdrawal' || a.kind === 'fee' ? '' : a.kind === 'deposit' || a.kind === 'dividend' || a.kind === 'interest' ? 'tone-good' : ''}>{money(Math.abs(a.amount))}</span>}
-                  </li>
-                ))}
-                {data.activity.length === 0 && <li className="muted">Nothing yet.</li>}
-              </ul>
-            </Card>
-            <div className="stack" style={{ gap: 18 }}>
+          <div className="grid-2-cards">
               <Card title="Cash">
                 <div className="cash-split">
                   <div><span className="muted small">Free to invest</span><strong>{money(s.cash.free ?? 0)}</strong></div>
@@ -241,8 +228,17 @@ export function Investing() {
                   </ul>
                 )}
               </Card>
-            </div>
           </div>
+            <Card title="Recent activity" pad={false}>
+              <PagedActivity items={data.activity} render={(a, i) => (
+                  <li key={i}>
+                    <span className={`act-icon act-${a.kind}`}><Icon name={ACT_ICON[a.kind] ?? 'transfer'} size={15} /></span>
+                    <div className="grow"><span>{a.title}</span><span className="muted small">{shortDate(a.date)}{a.detail ? ` · ${a.detail}` : ''}</span></div>
+                    {a.amount != null && <span className={a.kind === 'withdrawal' || a.kind === 'fee' ? '' : a.kind === 'deposit' || a.kind === 'dividend' || a.kind === 'interest' ? 'tone-good' : ''}>{money(Math.abs(a.amount))}</span>}
+                  </li>
+                )} />
+            </Card>
+
         </>
       ))}
       {open && <HoldingModal ticker={open} onClose={() => setOpen(null)} />}
@@ -536,4 +532,11 @@ function IsaAllowance() {
       )}
     </>
   );
+}
+
+/** Recent activity, eight at a time. */
+function PagedActivity({ items, render }: { items: any[]; render: (a: any, i: number) => React.ReactNode }) {
+  const { rows, pager } = usePaged(items, 8, String(items.length));
+  if (items.length === 0) return <ul className="activity"><li className="muted">Nothing yet.</li></ul>;
+  return <><ul className="activity">{rows.map((a, i) => render(a, i))}</ul>{pager}</>;
 }

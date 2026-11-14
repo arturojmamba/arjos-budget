@@ -104,3 +104,19 @@ test('valuations cannot be in the future or on non-investment accounts', () => {
   assert.throws(() => setValuation(db, isa, addDays(todayIso(), 1), 100), /future/);
   assert.throws(() => setValuation(db, northbank, todayIso(), 100), /only for investment/);
 });
+
+test('a Trading 212 synced ISA counts what Trading 212 recorded as put in, not just matched transfers', () => {
+  const { db, isa, pay, bal } = setup();
+  db.prepare("UPDATE accounts SET sync_provider = 'trading212' WHERE id = ?").run(isa);
+  pay('2026-04-10', 50000); // only one deposit matched to a bank transfer
+  const cash = db.prepare('INSERT INTO t212_cash (reference, account_id, type, amount, currency, date_time) VALUES (?, ?, ?, ?, ?, ?)');
+  cash.run('d1', isa, 'DEPOSIT', 50000, 'GBP', '2026-04-10T09:00:00Z');
+  cash.run('d2', isa, 'DEPOSIT', 70000, 'GBP', '2026-05-02T09:00:00Z'); // paid from another bank
+  cash.run('w1', isa, 'WITHDRAW', -20000, 'GBP', '2026-05-20T09:00:00Z');
+  cash.run('i1', isa, 'INTEREST', 300, 'GBP', '2026-05-31T09:00:00Z'); // not money you put in
+  setValuation(db, isa, '2026-05-31', 110000);
+  const a = bal(isa, '2026-06-30');
+  assert.equal(a.contributed, 100000);
+  assert.equal(a.growth, a.balance - 100000);
+  assert.equal(bal(isa, '2026-04-30').contributed, 50000, 'only what was put in by that date');
+});

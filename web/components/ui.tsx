@@ -48,7 +48,7 @@ export const isIconName = (s: string) => /^[a-z0-9-]+$/.test(s);
 
 export function Bubble({ colour, icon, label, size = 36 }: { colour: string; icon?: string | null; label?: string; size?: number }) {
   return (
-    <span className="bubble" style={{ width: size, height: size, background: `${colour}1f`, color: `color-mix(in srgb, ${colour} 80%, var(--text))` }}>
+    <span className="bubble" style={{ width: size, height: size, background: `color-mix(in srgb, ${colour} 12%, transparent)`, color: `color-mix(in srgb, ${colour} 80%, var(--text))` }}>
       {iconFor(icon) ? <Icon name={iconFor(icon)!} size={Math.round(size * 0.5)} />
         : icon ? <span className="bubble-emoji" style={{ fontSize: Math.round(size * 0.52) }}>{icon}</span>
         : <span style={{ fontSize: size * 0.36 }}>{initials(label ?? '?')}</span>}
@@ -207,7 +207,7 @@ export function amountClass(p: number, kind?: string): string {
   return p > 0 ? 'amt-in' : 'amt-out';
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: 'good' | 'bad' }) {
+export function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: 'good' | 'bad' | 'info' }) {
   return (
     <div className="stat">
       <p className="stat-label">{label}</p>

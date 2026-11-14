@@ -57,6 +57,14 @@ export function listAccounts(db: DB, opts: { asOf?: string; includeArchived?: bo
     let valuationDate: string | null = null;
     if (r.type === 'investment') {
       contributed = r.balance;
+      // Synced with Trading 212: what you've put in is what Trading 212 recorded (deposits less
+      // withdrawals), the same figure Investing shows. Matched bank transfers can miss deposits.
+      if (r.sync_provider === 'trading212') {
+        const t = db.prepare(
+          "SELECT COUNT(*) AS n, IFNULL(SUM(CASE WHEN type IN ('DEPOSIT','TRANSFER','WITHDRAW') THEN amount ELSE 0 END), 0) AS net FROM t212_cash WHERE account_id = ? AND substr(date_time, 1, 10) <= ?",
+        ).get(r.id, asOf) as { n: number; net: number };
+        if (t.n > 0) contributed = t.net;
+      }
       // Market value = latest valuation on or before the date, plus anything paid in or out since.
       const v = db.prepare('SELECT date, value FROM valuations WHERE account_id = ? AND date <= ? ORDER BY date DESC LIMIT 1').get(r.id, asOf) as { date: string; value: number } | undefined;
       if (v) {

@@ -27,10 +27,11 @@ interface PaydayData {
 interface Log { cycle: string; period: string; completedAt: string; inProgress: boolean; planned: { pay: number; plan: { bills: number; debts: number; savings: number; budgets: number; buffer: number } }; actual: { income: number; spending: number; saved: number; left: number } }
 
 const SPLIT = [
-  { key: 'bills', label: 'Bills', colour: '#6250d6' },
-  { key: 'debts', label: 'Debt payments', colour: '#e34948' },
-  { key: 'savings', label: 'Savings', colour: '#0ea5e9' },
-  { key: 'budgets', label: 'Budgets', colour: '#eda100' },
+  // The same colours as Overview's This month: bills gold, debts red, savings blue, spending slate.
+  { key: 'bills', label: 'Bills', colour: '#eab308' },
+  { key: 'debts', label: 'Debt payments', colour: 'var(--bad)' },
+  { key: 'savings', label: 'Savings', colour: 'var(--saved)' },
+  { key: 'budgets', label: 'Budgets', colour: 'var(--spend)' },
 ] as const;
 
 export function Payday({ params }: { params: URLSearchParams }) {

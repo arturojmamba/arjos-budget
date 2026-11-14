@@ -327,26 +327,24 @@ function Explorer({ params, set }: { params: URLSearchParams; set: (x: Record<st
               </Card>
               <div className="grid-main">
                 {data.level !== 'transactions' ? (
-                  <Card pad={false} className="fit-row" title="Breakdown" action={<span className="muted small">{data.compared ? `change vs ${shortDate(data.previous.from)} – ${shortDate(data.previous.to)}` : 'no earlier data to compare with'}</span>}>
+                  <Card pad={false} title="Breakdown" action={<span className="muted small">{data.compared ? `change vs ${shortDate(data.previous.from)} – ${shortDate(data.previous.to)}` : 'no earlier data to compare with'}</span>}>
                     <BreakdownTable data={data} hidden={hidden} drill={drill} />
                   </Card>
                 ) : (
                   <TransactionsCard data={data} range={range} />
                 )}
                 {data.level !== 'transactions' ? (
-                  <Card pad={false} title={data.level === 'merchant' ? 'Biggest spends' : 'Top places'}>
+                  <Card pad={false} className={data.level === 'merchant' ? undefined : 'fit-row'} title={data.level === 'merchant' ? 'Biggest spends' : 'Top places'}>
                     {data.level === 'merchant' ? <TxList list={data.transactions.slice().sort((a, b) => b.amount - a.amount).slice(0, 10)} /> : (
-                      <ul className="place-list">
-                        {data.places.slice(0, 10).map((p) => (
-                          <li key={p.merchant}>
+                      <FitList items={data.places} resetKey={data.places.map((p: any) => p.merchant).join('|')} className="place-list" render={(p: any) => (
+                          <li key={p.merchant} data-fit-row>
                             <button onClick={() => set({ merchant: p.merchant })}>
                               <span className="grow"><strong className="ellipsis">{p.label}</strong><span className="muted small">{p.count} × {money(p.average)} · {p.category} · last {shortDate(p.last)}</span></span>
                               <Spark values={p.values} />
                               <strong><Money value={p.total} /></strong>
                             </button>
                           </li>
-                        ))}
-                      </ul>
+                        )} />
                     )}
                   </Card>
                 ) : (
@@ -527,7 +525,7 @@ function Habits({ params, set }: { params: URLSearchParams; set: (x: Record<stri
           <div className="grid-2-cards">
             <Card title="By day of the week" action={data.busiest && <span className="muted small">Busiest: {data.busiest}</span>}>
               <StackedBars labels={data.weekday.map((d) => d.short)} titles={data.weekday.map((d) => `${d.day}s · ${d.count} spends over ${d.days} days`)}
-                series={[{ key: 'perDay', label: 'Average per day', colour: '#2a78d6', values: data.weekday.map((d) => d.perDay) }]} legend={false} height={220} />
+                series={[{ key: 'perDay', label: 'Average per day', colour: 'var(--spend)', values: data.weekday.map((d) => d.perDay) }]} legend={false} height={220} />
             </Card>
             <Card title="How big your spends are" pad={false}>
               <table className="report-table sizes">
@@ -676,8 +674,8 @@ function CashFlow() {
         <Card title="Fixed and flexible spending">
           <StackedBars labels={labels} titles={titles} height={220}
             series={[
-              { key: 'fixed', label: 'Fixed: rent, bills, subscriptions, loans', colour: '#6250d6', values: f.map((x) => x.fixed) },
-              { key: 'flexible', label: 'Flexible: everything else', colour: '#eda100', values: f.map((x) => x.flexible) },
+              { key: 'fixed', label: 'Fixed: rent, bills, subscriptions, loans', colour: '#eab308', values: f.map((x) => x.fixed) },
+              { key: 'flexible', label: 'Flexible: everything else', colour: 'var(--spend)', values: f.map((x) => x.flexible) },
             ]}
             reference={{ value: data.averages.spending, label: `average ${money(data.averages.spending)}` }} />
         </Card>
@@ -1032,20 +1030,32 @@ function BreakdownTable({ data, hidden, drill }: { data: any; hidden: Set<string
   return (
     <div className="fit-fill" ref={ref}>
     <table className="report-table breakdown">
-      <thead data-fit-head><tr><th>{data.level === 'category' ? 'Category' : data.level === 'subcategory' ? 'Subcategory' : 'Place'}</th><th className="num">Spent</th><th className="hide-sm">Share</th><th className="num hide-sm">Per month</th><th className="num">Change</th><th className="hide-sm">Trend</th></tr></thead>
+      <thead data-fit-head><tr><th>{data.level === 'category' ? 'Category' : data.level === 'subcategory' ? 'Subcategory' : 'Place'}</th><th className="num">Spent</th><th className="hide-sm">Share</th><th className="num hide-sm">Per month</th>{data.compared && <th className="num">Change</th>}<th className="hide-sm">Trend</th></tr></thead>
       <tbody>
         {rows.map((s) => (
           <tr data-fit-row key={s.key} className={`${s.drill ? 'clickable' : ''} ${hidden.has(s.key) ? 'off' : ''}`} onClick={() => drill(s.drill)} tabIndex={s.drill ? 0 : -1} onKeyDown={(e) => { if (e.key === 'Enter') drill(s.drill); }}>
-            <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} /><CatGlyph icon={s.icon} /><span className="ellipsis">{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
+            <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} /><CatGlyph icon={s.icon} /><span className="ellipsis" title={s.label}>{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
             <td className="num strong"><Money value={s.total} /></td>
             <td className="hide-sm"><span className="share-bar"><span style={{ width: `${Math.round(s.share * 100)}%`, background: s.colour }} /></span><span className="muted small">{pct(s.share)}</span></td>
             <td className="num hide-sm"><Money value={Math.round(s.total / data.months.length)} /></td>
-            <td className={`num ${changeTone(s.change)}`}>{s.prev == null ? <span className="muted">–</span> : s.prev === 0 ? <span className="muted small">new</span> : signedPct(s.change)}</td>
+            {data.compared && <td className={`num ${changeTone(s.change)}`}>{s.prev == null ? <span className="muted">–</span> : s.prev === 0 ? <span className="muted small">new</span> : signedPct(s.change)}</td>}
             <td className="hide-sm"><Spark values={s.values} colour={s.colour} width={64} /></td>
           </tr>
         ))}
       </tbody>
     </table>
+      {pager}
+    </div>
+  );
+}
+
+/** A list that fills its .fit-row card (height from the card beside it) and pages the rest. */
+function FitList<T>({ items, resetKey, className, render }: { items: T[]; resetKey: string; className?: string; render: (item: T) => React.ReactNode }) {
+  const { ref, size } = useFitRows(items.length, 10);
+  const { rows, pager } = usePaged(items, size, resetKey);
+  return (
+    <div className="fit-fill" ref={ref}>
+      <ul className={className}>{rows.map(render)}</ul>
       {pager}
     </div>
   );

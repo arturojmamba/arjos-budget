@@ -46,7 +46,7 @@ export function Goals() {
     <div className="page">
       <div className="stats">
         <Stat label="In your goals" value={<Money value={t.saved} />} sub={t.target ? `of ${money(t.target, { compact: true })} in targets` : `${t.count} goal${t.count === 1 ? '' : 's'}`} />
-        <Stat label={`Added in ${monthLabel(meta.currentMonth, true)}`} value={<Money value={t.thisMonth} />} tone={t.thisMonth >= 0 ? 'good' : 'bad'}
+        <Stat label={`Added in ${monthLabel(meta.currentMonth, true)}`} value={<Money value={t.thisMonth} />} tone={t.thisMonth > 0 ? 'info' : t.thisMonth < 0 ? 'bad' : undefined}
           sub={t.monthlyTarget ? `${money(t.monthlyTarget, { compact: true })} a month planned` : 'Set monthly amounts to plan ahead'} />
         <Stat label="Goals reached" value={<span>{t.done} <span className="muted small">of {live.filter((g) => g.target).length}</span></span>} sub="Goals with a target" />
         <Stat label="Essentials a month" value={<Money value={data.essentials} />} sub="Rent, bills, groceries, transport (3-month average)" />
@@ -161,7 +161,7 @@ function GoalCard({ g, essentials, onEdit, onMove }: { g: Goal; essentials: numb
 
       {g.target != null && (
         <div className="milestones" aria-hidden="true">
-          {[0.25, 0.5, 0.75, 1].map((m) => <span key={m} className={(g.progress ?? 0) >= m ? 'hit' : ''} style={(g.progress ?? 0) >= m ? { background: `color-mix(in srgb, ${g.colour} 22%, var(--surface))`, boxShadow: `inset 0 0 0 1px ${g.colour}` } : undefined}>{m === 1 ? '🏁' : `${m * 100}%`}</span>)}
+          {[0.25, 0.5, 0.75, 1].map((m) => <span key={m} className={(g.progress ?? 0) >= m ? 'hit' : ''} style={(g.progress ?? 0) >= m ? { background: `color-mix(in srgb, ${g.colour} 22%, var(--surface))`, boxShadow: `inset 0 0 0 1px ${g.colour}` } : undefined}>{m === 1 ? <Icon name="flag" size={12} /> : `${m * 100}%`}</span>)}
         </div>
       )}
 
@@ -175,7 +175,7 @@ function GoalCard({ g, essentials, onEdit, onMove }: { g: Goal; essentials: numb
 
       <p className="small goal-pace">{pace}</p>
       {g.growth != null && (
-        <p className="small muted">Paid in {money(g.contributed ?? 0)} · growth <span className={g.growth >= 0 ? 'tone-good' : 'tone-bad'}>{money(g.growth, { sign: true })}</span></p>
+        <p className="small muted">Money put in {money(g.contributed ?? 0)} · growth <span className={g.growth >= 0 ? 'tone-good' : 'tone-bad'}>{money(g.growth, { sign: true })}</span></p>
       )}
       {g.coverMonths != null && (
         <p className="small muted">Covers <strong className={g.coverMonths >= 3 ? 'tone-good' : 'tone-warn'}>{g.coverMonths.toFixed(1)} months</strong> of essentials ({money(essentials, { compact: true })} a month). 3–6 months is the usual aim.</p>

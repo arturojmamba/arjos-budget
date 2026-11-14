@@ -54,7 +54,7 @@ const NAV = NAV_GROUPS.flatMap((g) => g.items);
 /** "g" then a letter jumps to a page. */
 const JUMP: Record<string, string> = { o: '/', t: '/transactions', b: '/budgets', g: '/goals', i: '/bills', p: '/payday', d: '/debts', r: '/reports', v: '/investing', a: '/accounts', c: '/categories', m: '/import', s: '/settings' };
 const SHORTCUTS: [string, string][] = [
-  ['N', 'Add a transaction'], ['H', 'Hide or show amounts'], ['/', 'Search transactions'], ['?', 'Show these shortcuts'],
+  ['N', 'Add a transaction'], ['H', 'Hide or show amounts'], ['/', 'Search transactions'], ['← →', 'Previous or next month (Overview, Budgets)'], ['?', 'Show these shortcuts'],
   ['G then O', 'Overview'], ['G then T', 'Transactions'], ['G then B', 'Budgets'], ['G then G', 'Goals'], ['G then I', 'Bills and income'], ['G then P', 'Payday'],
   ['G then D', 'Debts'], ['G then R', 'Reports'], ['G then V', 'Investing'], ['G then A', 'Accounts'], ['G then C', 'Categories'], ['G then M', 'Import'], ['G then S', 'Settings'],
 ];
@@ -121,6 +121,10 @@ export function App() {
       const instant = () => { document.documentElement.classList.add('kbd-open'); setTimeout(() => document.documentElement.classList.remove('kbd-open'), 300); };
       if (k === 'n') { e.preventDefault(); instant(); setAdding(true); }
       if (k === 'h') { e.preventDefault(); toggleHidden(); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const btn = document.querySelector<HTMLButtonElement>(`.topbar .month-nav button[aria-label="${e.key === 'ArrowLeft' ? 'Previous' : 'Next'} month"]`);
+        if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+      }
       if (e.key === '?') { e.preventDefault(); instant(); setHelp(true); }
       if (e.key === '/') {
         e.preventDefault();

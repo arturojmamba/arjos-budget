@@ -3,6 +3,21 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.12.0",
+    "date": "2026-11-14",
+    "changes": [
+      "Accounts shows the same money put in and return for your Trading 212 ISA as Investing does",
+      "Debts: when you'll be debt-free is now a line of what's left to pay falling to zero, with years marked",
+      "One Add button per page again on Bills, Budgets and Categories (New category asks spending or income)",
+      "Numbers are no longer cut short: Payday step summaries wrap, calendar amounts read £1.3k, and bill and account details wrap on a phone, with Paid still there",
+      "No more empty space under Pending orders on Investing or beside Top places on Reports",
+      "Savings are the same blue everywhere, and Payday uses the same colours as Overview",
+      "Budgets turn amber when you're on pace to go over, and over-limit months are marked with ▲",
+      "Press ← and → to change month on Overview and Budgets",
+      "Smaller fixes: easier to read past days on the calendar, debt repayments show a debt icon, the spending line stops at today, and goal milestones end with a flag"
+    ]
+  },
+  {
     "version": "1.11.1",
     "date": "2026-11-14",
     "changes": [

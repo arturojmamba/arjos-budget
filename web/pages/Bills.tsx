@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { api, qs, type Occurrence, type Plan, type Recurring, type Suggestion } from '../api.ts';
+import { amountsHidden as amountsHiddenNow } from '../format.ts';
 import { FREQUENCY_LABELS, privateLabel, addMonths, dayMonth, money, monthLabel, pct, relativeDay, shortDate } from '../format.ts';
 import { Badge, Bubble, Card, Empty, Modal, Money, Stat, useApp, useData, useFitRows, usePaged, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { RecurringForm, type RecurringDraft } from '../components/RecurringForm.tsx';
 
 const TYPE_ICON: Record<string, string> = { bill: 'bolt', subscription: 'repeat', saving: 'piggy-bank', income: 'briefcase' };
-const TYPE_COLOUR: Record<string, string> = { bill: '#eab308', subscription: '#6366f1', saving: '#0ea5e9', income: '#059669' };
+const TYPE_COLOUR: Record<string, string> = { bill: '#eab308', subscription: '#6366f1', saving: 'var(--saved)', income: 'var(--income)' };
+/** Debt repayments are 'saving' transfers to a card or loan: show them as debt, not savings. */
+const occIcon = (o: { type: string; isDebt?: boolean }) => (o.isDebt ? 'percentage' : TYPE_ICON[o.type]);
+const occColour = (o: { type: string; isDebt?: boolean }) => (o.isDebt ? 'var(--bad)' : TYPE_COLOUR[o.type]);
 
 export function Bills() {
   const { meta, categories } = useApp();
@@ -35,9 +39,9 @@ export function Bills() {
       <div className="stats">
         <Stat label="Committed this month" value={<Money value={plan.committed} />}
           sub={plan.committedShare != null ? `${pct(plan.committedShare)} of income · bills, savings${plan.debtTotal ? ', debts' : ''}` : 'Bills and savings due'} />
-        <Stat label="Still to pay" value={<Money value={plan.billsRemaining} />} sub={`${money(plan.billsPaid, { compact: true })} of ${money(plan.billsTotal, { compact: true })} bills paid`} />
+        <Stat label="Bills still to pay" value={<Money value={plan.billsRemaining} />} sub={`${money(plan.billsPaid, { compact: true })} of ${money(plan.billsTotal, { compact: true })} bills paid`} />
         <Stat label="Regular costs per month" value={<Money value={plan.monthly.bills + plan.monthly.subscriptions} />}
-          sub={`${money(plan.monthly.subscriptions, { compact: true })} subscriptions · annual bills spread out`} />
+          sub={`Bills and subscriptions on average, yearly ones spread out · ${money(plan.monthly.subscriptions, { compact: true })} subscriptions`} />
         <Stat label="Income this month" value={<Money value={plan.incomeExpected} />}
           sub={`${money(plan.incomeReceived, { compact: true })} received${plan.incomeExtra > 0 ? ` · incl. ${money(plan.incomeExtra, { compact: true })} above usual pay` : ''}`} />
       </div>
@@ -55,8 +59,7 @@ export function Bills() {
           action={<span className="due-head-actions">
             {day
               ? <button className="link-btn" onClick={() => setDay(null)}>Show the rest of the month</button>
-              : <span className="muted small">{money(leftOut)} still to go out</span>}
-            <button className="btn btn-sm btn-primary" onClick={() => setEditing({})}><Icon name="plus" size={14} /> Add</button>
+              : <span className="muted small">{money(leftOut)} still to go out, incl. savings and debts</span>}
           </span>}>
           {upcoming.length === 0 ? (
             day
@@ -71,7 +74,7 @@ export function Bills() {
                 return (
                   <li data-fit-row key={`${o.recurringId}-${o.dueDate}`} className={`due status-${o.status}`}>
                     <span className="due-date"><strong>{dm.day}</strong><span>{dm.month}</span></span>
-                    <Bubble colour={o.categoryColour ?? TYPE_COLOUR[o.type]} icon={o.categoryIcon ?? TYPE_ICON[o.type]} size={34} />
+                    <Bubble colour={o.categoryColour ?? occColour(o)} icon={o.categoryIcon ?? occIcon(o)} size={34} />
                     <span className="grow">
                       <span className="due-name">{o.name}</span>
                       <span className="muted small">{o.accountName} · {o.status === 'paid' && o.paidDate ? `paid ${shortDate(o.paidDate)}` : relativeDay(o.dueDate, meta.today)}</span>
@@ -107,7 +110,7 @@ export function Bills() {
                   <button className="btn btn-sm" onClick={() => setEditing({ draft: { type: 'income', oneOff: true, name: 'Bonus', categoryId: categories.find((c) => c.name === 'Bonuses')?.id ?? null } })}><Icon name="plus" size={14} /> Expected bonus</button></span>
               : <span className="muted small">{money(total)} a month{anyShared ? ' (your share)' : ''}</span>}>
             <table className="rec-table">
-              <thead><tr><th>Name</th><th>How often</th><th className="num">Amount</th><th className="num">Per month</th><th>Next due</th><th>Account</th></tr></thead>
+              <thead><tr><th>Name</th><th>How often</th><th className="num">Amount</th>{list.some((x) => x.frequency !== 'monthly' && !x.oneOff) && <th className="num">Per month</th>}<th>Next due</th><th>Account</th></tr></thead>
               <tbody>
                 {list.map((i) => (
                   <tr key={i.id} onClick={() => setEditing({ item: i })} className={i.active ? '' : 'is-inactive'}>
@@ -128,7 +131,7 @@ export function Bills() {
                     <td className="num">{i.sharedBack > 0
                       ? <span className="shared-amt"><span>{money(i.yourShare)}</span><span className="muted small">of {money(i.amount)}</span></span>
                       : money(i.amount)}</td>
-                    <td className="num muted">{i.frequency === 'monthly' || i.oneOff ? '' : money(i.monthlyNet)}</td>
+                    {list.some((x) => x.frequency !== 'monthly' && !x.oneOff) && <td className="num muted">{i.frequency === 'monthly' || i.oneOff ? '' : money(i.monthlyNet)}</td>}
                     <td>{i.next ? <>{shortDate(i.next.dueDate)} {i.next.status === 'overdue' && <Badge tone="bad">Overdue</Badge>}</> : '—'}</td>
                     <td className="muted">{i.type === 'saving' ? `${i.accountName} → ${i.transferAccountName}` : i.accountName}</td>
                   </tr>
@@ -167,7 +170,7 @@ function StatusBadge({ o }: { o: Occurrence }) {
     case 'skipped': return <Badge>Skipped</Badge>;
     case 'overdue': return <Badge tone="bad">Overdue</Badge>;
     case 'due': return <Badge tone="warn">Due</Badge>;
-    default: return <Badge tone="info">Upcoming</Badge>;
+    default: return <Badge>Upcoming</Badge>;
   }
 }
 
@@ -187,7 +190,7 @@ export function PlanBreakdown({ plan }: { plan: Plan }) {
   const income = Math.max(plan.incomeExpected, 1);
   const parts = [
     { label: 'Bills and subscriptions', value: plan.billsTotal, colour: '#eab308', sub: `${money(plan.billsPaid, { compact: true })} paid` },
-    { label: 'Savings', value: plan.savingsTotal, colour: '#0ea5e9', sub: `${money(plan.savingsDone, { compact: true })} moved` },
+    { label: 'Savings', value: plan.savingsTotal, colour: 'var(--saved)', sub: `${money(plan.savingsDone, { compact: true })} moved` },
     ...(plan.debtTotal > 0 ? [{ label: 'Debt repayments', value: plan.debtTotal, colour: 'var(--bad)', sub: `${money(plan.debtDone, { compact: true })} paid` }] : []),
     { label: 'Everyday spending so far', value: Math.max(0, plan.otherSpending), colour: 'var(--spend)' },
   ];
@@ -359,9 +362,9 @@ function BillCalendar({ today, current, selected, onSelect }: { today: string; c
               onClick={() => clickable && onSelect(d)}>
               <span className="cal-day">{Number(d.slice(8))}</span>
               {list.length > 0 && (
-                <span className="cal-dots">{list.slice(0, 4).map((o, j) => <i key={j} style={{ background: o.categoryColour ?? TYPE_COLOUR[o.type] }} />)}</span>
+                <span className="cal-dots">{list.slice(0, 4).map((o, j) => <i key={j} style={{ background: o.categoryColour ?? occColour(o) }} />)}</span>
               )}
-              {income ? <span className="cal-amt amt-in">Payday</span> : total > 0 ? <span className="cal-amt">{money(total, { compact: true })}</span> : null}
+              {income ? <span className="cal-amt amt-in">Pay</span> : total > 0 ? <span className="cal-amt">{calAmount(total)}</span> : null}
             </button>
           );
         })}
@@ -372,4 +375,10 @@ function BillCalendar({ today, current, selected, onSelect }: { today: string; c
       </div>
     </Card>
   );
+}
+
+/** Calendar cells are small: £86, £378, £1.3k. Never cut short, and hidden like every amount when amounts are hidden. */
+function calAmount(p: number): string {
+  if (amountsHiddenNow() || p < 100000) return money(p, { compact: true });
+  return `£${(p / 100000).toFixed(1).replace(/\.0$/, '')}k`;
 }

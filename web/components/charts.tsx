@@ -83,21 +83,25 @@ export function IncomeSpendBars({ data, height = 200 }: { data: { month: string;
 }
 
 /** Cumulative spending through the month as a small area sparkline. */
-export function Cumulative({ daily, month, height = 64 }: { daily: { date: string; amount: number }[]; month: string; height?: number }) {
+export function Cumulative({ daily, month, height = 64, today }: { daily: { date: string; amount: number }[]; month: string; height?: number; today?: string }) {
   const [y, m] = month.split('-').map(Number);
   const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const byDay = new Map(daily.map((d) => [Number(d.date.slice(8, 10)), d.amount]));
   let run = 0;
   const pts: [number, number][] = [];
-  for (let d = 1; d <= days; d++) {
+  // This month: stop at today, so the line doesn't run flat into days that haven't happened.
+  const last = today && today.slice(0, 7) === month ? Number(today.slice(8, 10)) : days;
+  for (let d = 1; d <= last; d++) {
     run += byDay.get(d) ?? 0;
     pts.push([d, run]);
   }
   const max = Math.max(1, run);
+  const lastX = ((last - 1) / (days - 1)) * 100;
   const path = pts.map(([d, v], i) => `${i ? 'L' : 'M'}${((d - 1) / (days - 1)) * 100},${100 - (v / max) * 92}`).join(' ');
   return (
-    <svg className="spark" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ height }} aria-hidden="true">
-      <path d={`${path} L100,100 L0,100 Z`} className="spark-fill" />
+    <svg className="spark" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ height }} role="img"
+      aria-label={`Spending built up to ${money(run)} by day ${last} of ${days}`}>
+      <path d={`${path} L${lastX},100 L0,100 Z`} className="spark-fill" />
       <path d={path} className="spark-line" vectorEffect="non-scaling-stroke" />
     </svg>
   );

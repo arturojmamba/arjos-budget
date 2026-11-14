@@ -22,7 +22,7 @@ const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'trading212', label: 'Trading 212', icon: 'trending-up', hint: 'Sync status and permissions' },
   { key: 'data', label: 'Data', icon: 'archive', hint: 'Health checks, backups and export' },
   { key: 'about', label: 'About & updates', icon: 'info', hint: 'Version and updates' },
-  { key: 'whatsnew', label: "What's new", icon: 'sparkles', hint: 'Every version, what changed and when' },
+  { key: 'whatsnew', label: "What's new", icon: 'file', hint: 'Every version, what changed and when' },
   { key: 'guide', label: 'Guide', icon: 'book', hint: 'How to set Coil up and use every page' },
 ];
 

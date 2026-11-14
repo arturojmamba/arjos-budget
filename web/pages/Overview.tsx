@@ -34,7 +34,7 @@ export function Overview({ month }: { month: string }) {
   const showDue = isCurrent && dueSoon.length > 0;
 
   const hasData = s.history.some((h) => h.income || h.spending) || s.accounts.some((a) => a.balance !== 0);
-  const catIcon = (id: number | null) => categories.find((c) => c.id === id)?.icon ?? 'dots';
+  const catIcon = (id: number | null) => { const c = categories.find((x) => x.id === id); return c?.icon ?? categories.find((x) => x.id === c?.parentId)?.icon ?? 'dots'; };
   const left = s.income - s.spending;
 
   return (
@@ -222,7 +222,7 @@ function MoneyAndDebt({ s }: { s: Summary }) {
     return { key: g.key, el };
   });
   return (
-    <Card title="Money and debt" action={<span className="row gap"><span className="muted small">Net worth <Money value={s.netWorth} /></span><button className="link-btn" onClick={() => navigate('/accounts')}>Accounts</button></span>}>
+    <Card title="Money and debt" action={<button className="link-btn" onClick={() => navigate('/accounts')}>Accounts</button>}>
       <div className={`money-groups ${stack ? 'stacked' : ''}`}>
         {stack ? <>
           <div className="money-col">{groups.filter((g) => g.key !== stack).map((g) => g.el)}</div>
@@ -253,7 +253,7 @@ function SpendingByCategory({ s, month }: { s: Summary; month: string }) {
   const { data: other } = useData<MonthSpending | null>(() => (m === month ? Promise.resolve(null) : api.get(`/api/spending${qs({ month: m })}`)), [m, month]);
   const view: MonthSpending | null = m === month ? { month, spending: s.spending, byCategory: s.byCategory, daily: s.daily } : other;
   const earliest = meta.months[meta.months.length - 1] ?? month;
-  const catIcon = (id: number | null) => categories.find((c) => c.id === id)?.icon ?? 'dots';
+  const catIcon = (id: number | null) => { const c = categories.find((x) => x.id === id); return c?.icon ?? categories.find((x) => x.id === c?.parentId)?.icon ?? 'dots'; };
   const cats = (view?.byCategory ?? []).filter((c) => c.amount > 0);
   const shown = showAll ? cats : cats.slice(0, CAT_LIMIT);
   const hiddenTotal = cats.slice(CAT_LIMIT).reduce((t, c) => t + c.amount, 0);
@@ -291,7 +291,7 @@ function SpendingByCategory({ s, month }: { s: Summary; month: string }) {
           </div>
           <div className="spark-wrap">
             <span className="muted small">Spending through {monthLabel(m)}</span>
-            <Cumulative daily={view.daily} month={m} height={88} />
+            <Cumulative daily={view.daily} month={m} height={88} today={meta.today} />
           </div>
         </>
       )}
@@ -388,7 +388,7 @@ function MonthPace({ s, plan, payday, today, catIcon, hero }: { s: Summary; plan
               return (
                 <li key={t.id}>
                   <Bubble colour={c?.colour ?? '#94a3b8'} icon={catIcon(t.categoryId)} size={26} />
-                  <span className="grow ellipsis">{niceName(t.description)}<span className="muted small"> · {shortDate(t.date)}</span></span>
+                  <span className="grow ellipsis" title={niceName(t.description)}>{niceName(t.description)}</span><span className="muted small nowrap">{shortDate(t.date)}</span>
                   <Money value={t.amount} />
                 </li>
               );
