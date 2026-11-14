@@ -76,3 +76,11 @@ test('a Mac app is only replaced where it can be', () => {
   assert.match((macAppPath('/Applications/Ledger.app/Contents/MacOS/Ledger', () => false) as any).reason, /can't write/);
   assert.match((macAppPath('/usr/bin/node', ok) as any).reason, /installed app/);
 });
+
+test('when Windows blocks the installer, the reason says what to do', async () => {
+  const { windowsBlockedReason } = await import('../electron/update-core.ts');
+  const blocked = Object.assign(new Error('spawn UNKNOWN'), { code: 'UNKNOWN', errno: -4094 });
+  assert.match(windowsBlockedReason(blocked), /Smart App Control/);
+  assert.match(windowsBlockedReason(blocked), /data is safe/);
+  assert.doesNotMatch(windowsBlockedReason(Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' })), /Smart App Control/);
+});

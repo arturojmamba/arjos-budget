@@ -73,7 +73,7 @@ export interface DesktopHost {
   updates?: {
     info(): unknown;
     check(): Promise<unknown>;
-    install(): { ok: true } | { ok: false; reason: string };
+    install(): Promise<{ ok: true } | { ok: false; reason: string }>;
     setAuto(on: boolean): void;
     openManual(): void;
   };
@@ -101,7 +101,7 @@ route('GET', '/api/lock/status', ({ db, session }) => {
   return {
     enabled: !!lock?.enabled, locked: !!lock && !lock.isUnlocked(session), length: lock?.length ?? null, wait: lock?.waitSeconds() ?? 0,
     idleMinutes: lock?.enabled ? lock.idleMinutes : null, idleChoices: IDLE_CHOICES,
-    name: p.name, avatar: p.avatar, appName: p.appName, accent: getAppearance(db).accent, theme: getAppearance(db).theme,
+    name: p.name, avatar: p.avatar, accent: getAppearance(db).accent, theme: getAppearance(db).theme,
     touchId: !!lock?.enabled && !!desktop?.touchId?.available(), desktop: !!desktop,
   };
 });
@@ -113,7 +113,7 @@ route('POST', '/api/lock/unlock', ({ body, setCookie }) => {
 route('POST', '/api/lock/touchid', async ({ db, setCookie }) => {
   if (!lock?.enabled) return { ok: true };
   if (!desktop?.touchId?.available()) throw new ValidationError('Touch ID is not available');
-  const name = getProfile(db).appName || 'Coil';
+  const name = 'Coil';
   if (!(await desktop.touchId.prompt(`unlock ${name}`))) throw new ValidationError('Touch ID was cancelled');
   setCookie(sessionCookie(lock.startSession()));
   return { ok: true };
@@ -400,10 +400,10 @@ route('POST', '/api/desktop/update/check', async () => {
   if (!u) throw new ValidationError('Updates work in the desktop app');
   return { supported: true, ...((await u.check()) as object) };
 });
-route('POST', '/api/desktop/update/install', () => {
+route('POST', '/api/desktop/update/install', async () => {
   const u = desktop?.updates;
   if (!u) throw new ValidationError('Updates work in the desktop app');
-  const r = u.install();
+  const r = await u.install();
   if (!r.ok) throw new ValidationError(r.reason);
   return { ok: true };
 });

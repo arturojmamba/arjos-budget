@@ -1,6 +1,6 @@
 import { UpdateBanner } from './components/Updates.tsx';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, type Account, type Appearance, type Category, type Meta, type Profile } from './api.ts';
+import { api, type Account, type Appearance, type Category, type Meta, type Profile, APP_NAME } from './api.ts';
 import { AppContext } from './components/ui.tsx';
 import { Icon } from './components/Icon.tsx';
 import { TransactionForm } from './components/TransactionForm.tsx';
@@ -140,7 +140,7 @@ export function App() {
     <AppContext.Provider value={ctx}>
       <div className="shell">
         <aside className="sidebar">
-          <div className="brand"><BrandMark /><span>{meta.profile.appName || 'Coil'}</span></div>
+          <div className="brand"><BrandMark /><span>{APP_NAME}</span></div>
           <nav>
             {NAV_GROUPS.map((g, gi) => (
               <div key={gi} className="nav-group" role="group" aria-label={g.label ?? 'Main'}>
@@ -250,7 +250,7 @@ export function applyAppearance(a: Appearance, p?: Profile) {
   r.classList.toggle('text-large', a.textSize === 'large');
   r.classList.toggle('reduce-motion', a.reduceMotion);
   setShowPence(a.showPence);
-  const title = `${p?.appName || 'Coil'} · Personal finance`;
+  const title = `${APP_NAME} · Personal finance`;
   document.title = title;
   try { localStorage.setItem('finance.appearance', JSON.stringify(a)); localStorage.setItem('finance.title', title); } catch { /* ignore */ }
 }

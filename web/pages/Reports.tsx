@@ -325,21 +325,7 @@ function Explorer({ params, set }: { params: URLSearchParams; set: (x: Record<st
               <div className="grid-main">
                 {data.level !== 'transactions' ? (
                   <Card pad={false} title="Breakdown" action={<span className="muted small">{data.compared ? `change vs ${shortDate(data.previous.from)} – ${shortDate(data.previous.to)}` : 'no earlier data to compare with'}</span>}>
-                    <table className="report-table breakdown">
-                      <thead><tr><th>{data.level === 'category' ? 'Category' : data.level === 'subcategory' ? 'Subcategory' : 'Place'}</th><th className="num">Spent</th><th className="hide-sm">Share</th><th className="num hide-sm">Per month</th><th className="num">Change</th><th className="hide-sm">Trend</th></tr></thead>
-                      <tbody>
-                        {data.series.map((s) => (
-                          <tr key={s.key} className={`${s.drill ? 'clickable' : ''} ${hidden.has(s.key) ? 'off' : ''}`} onClick={() => drill(s.drill)} tabIndex={s.drill ? 0 : -1} onKeyDown={(e) => { if (e.key === 'Enter') drill(s.drill); }}>
-                            <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} />{s.icon && <span>{s.icon}</span>}<span className="ellipsis">{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
-                            <td className="num strong"><Money value={s.total} /></td>
-                            <td className="hide-sm"><span className="share-bar"><span style={{ width: `${Math.round(s.share * 100)}%`, background: s.colour }} /></span><span className="muted small">{pct(s.share)}</span></td>
-                            <td className="num hide-sm"><Money value={Math.round(s.total / data.months.length)} /></td>
-                            <td className={`num ${changeTone(s.change)}`}>{s.prev == null ? <span className="muted">–</span> : s.prev === 0 ? <span className="muted small">new</span> : signedPct(s.change)}</td>
-                            <td className="hide-sm"><Spark values={s.values} colour={s.colour} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <BreakdownTable data={data} hidden={hidden} drill={drill} />
                   </Card>
                 ) : (
                   <TransactionsCard data={data} range={range} />
@@ -1031,5 +1017,46 @@ function YearReview({ params, onChange }: { params: URLSearchParams; onChange: (
       </div>
       <p className="muted small print-only">Generated {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Transfers between your own accounts and card repayments aren't counted as money in or out.</p>
     </div>
+  );
+}
+
+const BREAKDOWN_PAGE = 10;
+
+/** The breakdown table, ten rows at a time, biggest first, with arrows for the rest. */
+function BreakdownTable({ data, hidden, drill }: { data: any; hidden: Set<string>; drill: (d: any) => void }) {
+  const [page, setPage] = useState(0);
+  const keys = data.series.map((s: any) => s.key).join('|');
+  useEffect(() => setPage(0), [keys]);
+  const pages = Math.max(1, Math.ceil(data.series.length / BREAKDOWN_PAGE));
+  const at = Math.min(page, pages - 1);
+  const rows = data.series.slice(at * BREAKDOWN_PAGE, (at + 1) * BREAKDOWN_PAGE);
+  const from = at * BREAKDOWN_PAGE + 1, to = at * BREAKDOWN_PAGE + rows.length;
+  return (
+    <>
+    <table className="report-table breakdown">
+      <thead><tr><th>{data.level === 'category' ? 'Category' : data.level === 'subcategory' ? 'Subcategory' : 'Place'}</th><th className="num">Spent</th><th className="hide-sm">Share</th><th className="num hide-sm">Per month</th><th className="num">Change</th><th className="hide-sm">Trend</th></tr></thead>
+      <tbody>
+        {rows.map((s) => (
+          <tr key={s.key} className={`${s.drill ? 'clickable' : ''} ${hidden.has(s.key) ? 'off' : ''}`} onClick={() => drill(s.drill)} tabIndex={s.drill ? 0 : -1} onKeyDown={(e) => { if (e.key === 'Enter') drill(s.drill); }}>
+            <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} />{s.icon && <span>{s.icon}</span>}<span className="ellipsis">{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
+            <td className="num strong"><Money value={s.total} /></td>
+            <td className="hide-sm"><span className="share-bar"><span style={{ width: `${Math.round(s.share * 100)}%`, background: s.colour }} /></span><span className="muted small">{pct(s.share)}</span></td>
+            <td className="num hide-sm"><Money value={Math.round(s.total / data.months.length)} /></td>
+            <td className={`num ${changeTone(s.change)}`}>{s.prev == null ? <span className="muted">–</span> : s.prev === 0 ? <span className="muted small">new</span> : signedPct(s.change)}</td>
+            <td className="hide-sm"><Spark values={s.values} colour={s.colour} /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+      {pages > 1 && (
+        <nav className="breakdown-pager" aria-label="Breakdown pages">
+          <span className="muted small">{from}–{to} of {data.series.length}</span>
+          <span className="row">
+            <button className="icon-btn" onClick={() => setPage(at - 1)} disabled={at === 0} aria-label="Previous 10"><Icon name="chevron-left" size={16} /></button>
+            <button className="icon-btn" onClick={() => setPage(at + 1)} disabled={at >= pages - 1} aria-label="Next 10"><Icon name="chevron-right" size={16} /></button>
+          </span>
+        </nav>
+      )}
+    </>
   );
 }

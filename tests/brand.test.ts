@@ -19,7 +19,6 @@ test('the Coil restyle: the old default coral and name move over, your own choic
   const again = openDb(file);
   assert.equal(getAppearance(again).accent, '#d9c08e');
   assert.equal(getAppearance(again).theme, 'dark');
-  assert.equal(getProfile(again).appName, '');
   assert.equal(getProfile(again).name, 'Alex');
   again.close();
 
@@ -31,7 +30,6 @@ test('the Coil restyle: the old default coral and name move over, your own choic
   raw.close();
   const third = openDb(file);
   assert.equal(getAppearance(third).accent, '#2563eb');
-  assert.equal(getProfile(third).appName, 'My money');
   third.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });

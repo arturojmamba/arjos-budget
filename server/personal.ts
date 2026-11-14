@@ -13,7 +13,7 @@ export interface Appearance {
   reduceMotion: boolean;
   weekStart: 'monday';
 }
-export interface Profile { name: string; appName: string; avatar: string | null }
+export interface Profile { name: string; avatar: string | null }
 
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: 'system', accent: '#d9c08e', density: 'comfortable', textSize: 'normal', showPence: true,
@@ -28,8 +28,8 @@ function readJson<T>(db: DB, key: string, fallback: T): T {
 export function getAppearance(db: DB): Appearance { return readJson(db, 'appearance', DEFAULT_APPEARANCE); }
 
 export function getProfile(db: DB): Profile {
-  const p = readJson(db, 'profile', { name: '', appName: '' });
-  return { name: p.name ?? '', appName: p.appName ?? '', avatar: getSetting(db, 'avatar', '') || null };
+  const p = readJson(db, 'profile', { name: '' });
+  return { name: p.name ?? '', avatar: getSetting(db, 'avatar', '') || null };
 }
 
 export function saveAppearance(db: DB, input: Partial<Appearance>) {
@@ -44,11 +44,10 @@ export function saveAppearance(db: DB, input: Partial<Appearance>) {
   return a;
 }
 
-export function saveProfile(db: DB, input: { name?: string; appName?: string }) {
+export function saveProfile(db: DB, input: { name?: string }) {
   const cur = getProfile(db);
   const name = String(input.name ?? cur.name).trim().slice(0, 40);
-  const appName = String(input.appName ?? cur.appName).trim().slice(0, 30);
-  setSetting(db, 'profile', JSON.stringify({ name, appName }));
+  setSetting(db, 'profile', JSON.stringify({ name }));
   return getProfile(db);
 }
 

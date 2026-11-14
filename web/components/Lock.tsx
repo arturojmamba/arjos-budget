@@ -5,7 +5,7 @@ import { Icon } from './Icon.tsx';
 
 interface LockStatus {
   enabled: boolean; locked: boolean; length: number | null; wait: number; idleMinutes: number | null;
-  name: string; avatar: string | null; appName: string; accent: string; theme: string; touchId: boolean; desktop: boolean;
+  name: string; avatar: string | null; accent: string; theme: string; touchId: boolean; desktop: boolean;
 }
 
 /** Shows the lock screen until the passcode is entered; the app itself loads only after that. */
@@ -122,7 +122,7 @@ function LockScreen({ status, onUnlocked }: { status: LockStatus; onUnlocked: ()
   return (
     <div className="lock-screen">
       <div className="lock-card">
-        <div className="lock-brand"><BrandMark size={26} /> {status.appName || 'Coil'}</div>
+        <div className="lock-brand"><BrandMark size={26} /> Coil</div>
         {status.avatar ? <img className="lock-avatar" src={status.avatar} alt="" /> : <span className="lock-avatar lock-initials">{initials}</span>}
         <h1 className="lock-name">{first ? `Welcome back, ${first}` : 'Welcome back'}</h1>
         <p className="lock-hint">{error ?? 'Enter your passcode'}</p>

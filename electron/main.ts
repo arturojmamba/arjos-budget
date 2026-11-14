@@ -328,8 +328,8 @@ if (!app.requestSingleInstanceLock()) {
         check: () => updater.check(),
         setAuto: (on) => updater.setAuto(on),
         openManual: () => updater.openManual(),
-        install: () => {
-          const r = updater.install();
+        install: async () => {
+          const r = await updater.install();
           if (r.ok) setTimeout(() => { quitting = true; app.quit(); }, 300);
           return r;
         },
@@ -368,7 +368,7 @@ if (!app.requestSingleInstanceLock()) {
       const out = (line: string) => { console.log(line); if (process.env.LEDGER_SMOKE_FILE) fs.writeFileSync(process.env.LEDGER_SMOKE_FILE, line); };
       const info = await updater.check();
       if (info.state.status !== 'ready') { out(`UPDATE TEST FAILED ${JSON.stringify(info.state)}`); app.exit(1); return; }
-      const r = updater.install({ relaunch: false });
+      const r = await updater.install({ relaunch: false });
       out(r.ok ? `UPDATE TEST OK ${app.getVersion()} -> ${info.state.available.version}` : `UPDATE TEST FAILED ${r.reason}`);
       await running.close();
       app.exit(r.ok ? 0 : 1);

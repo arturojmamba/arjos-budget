@@ -1,16 +1,17 @@
 import React, { useRef, useState } from 'react';
-import { api, type Appearance } from '../api.ts';
+import { api, APP_NAME, type Appearance } from '../api.ts';
 import { applyAppearance, Avatar } from '../App.tsx';
 import { Badge, Card, Field, Segmented, useApp, useConfirm, useData } from '../components/ui.tsx';
 import { navigate, setParams, useRoute } from '../router.ts';
 import { Icon } from '../components/Icon.tsx';
 import { T212Card } from '../components/T212.tsx';
 import { AboutCard } from '../components/Updates.tsx';
+import { BrandMark } from '../components/BrandMark.tsx';
 import { money } from '../format.ts';
 
 type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'notifications' | 'budgeting' | 'trading212' | 'data' | 'about';
 const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
-  { key: 'profile', label: 'Profile', icon: 'heart', hint: 'Your name, picture and the app’s name' },
+  { key: 'profile', label: 'Profile', icon: 'heart', hint: 'Your name and picture' },
   { key: 'appearance', label: 'Appearance', icon: 'sparkles', hint: 'Theme, colour, text size and layout' },
   { key: 'display', label: 'Numbers & privacy', icon: 'eye', hint: 'Pence, start page and hiding amounts' },
   { key: 'lock', label: 'Passcode', icon: 'lock', hint: 'Ask for a passcode when the app opens' },
@@ -39,6 +40,7 @@ export function Settings() {
             {t.key === 'data' && issues > 0 && <span className="settings-dot" aria-label={`${issues} to look at`}>{issues}</span>}
           </button>
         ))}
+        <p className="settings-credit"><BrandMark size={20} className="brand-mark-sm" /><span><strong>{APP_NAME}</strong> · Made by Arjo</span></p>
       </nav>
       <section className="settings-body" role="tabpanel" aria-label={current.label}>
         <header className="settings-head">
@@ -269,7 +271,7 @@ function NotificationsCard() {
   if (!d) return <Card title="Notifications"><p className="muted">Loading…</p></Card>;
   const s = d.settings;
   const mac = d.platform === 'darwin';
-  const appName = meta.profile.appName || 'Coil';
+  const appName = APP_NAME;
   async function save(body: Record<string, unknown>) {
     try { setLocal(await api.put<NotifyState>('/api/notifications', body)); } catch (e: any) { toast(e.message, 'error'); }
   }
@@ -342,10 +344,9 @@ function NotificationsCard() {
 function ProfileCard() {
   const { meta, refresh, toast } = useApp();
   const [name, setName] = useState(meta.profile.name);
-  const [appName, setAppName] = useState(meta.profile.appName);
   const file = useRef<HTMLInputElement>(null);
   async function save() {
-    try { await api.put('/api/profile', { name, appName }); toast('Profile saved'); refresh(); } catch (e: any) { toast(e.message, 'error'); }
+    try { await api.put('/api/profile', { name }); toast('Profile saved'); refresh(); } catch (e: any) { toast(e.message, 'error'); }
   }
   async function pick(f: File) {
     try {
@@ -369,8 +370,7 @@ function ProfileCard() {
         </div>
         <div className="stack" style={{ gap: 10 }}>
           <Field label="Your name" hint="Used for the greeting on Overview."><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" maxLength={40} /></Field>
-          <Field label="App name" hint="Shown in the sidebar and the browser tab."><input value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Coil" maxLength={30} /></Field>
-          <div><button className="btn" onClick={save} disabled={name === meta.profile.name && appName === meta.profile.appName}>Save</button></div>
+          <div><button className="btn" onClick={save} disabled={name === meta.profile.name}>Save</button></div>
         </div>
       </div>
     </Card>

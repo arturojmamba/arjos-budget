@@ -95,6 +95,7 @@ export function AboutCard() {
     return (
       <Card title="About">
         <p className="muted">You're running Coil from its source folder (<code>npm start</code>). To update, pull the latest code and restart: <code>git pull && npm start</code>. The desktop app updates itself.</p>
+        <p className="muted small about-credit">Coil · Made by Arjo</p>
       </Card>
     );
   }
@@ -142,6 +143,7 @@ export function AboutCard() {
           <Notes text={s.available.notes} />
         </Modal>
       )}
+      <p className="muted small about-credit">Coil · Made by Arjo</p>
     </Card>
   );
 }

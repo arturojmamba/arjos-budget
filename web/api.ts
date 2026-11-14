@@ -41,7 +41,9 @@ export interface Appearance {
   theme: 'system' | 'light' | 'dark'; accent: string; density: 'comfortable' | 'compact'; textSize: 'small' | 'normal' | 'large';
   showPence: boolean; startPage: string; startHidden: boolean; reduceMotion: boolean; weekStart: 'monday';
 }
-export interface Profile { name: string; appName: string; avatar: string | null }
+export interface Profile { name: string; avatar: string | null }
+/** The app's name. Fixed: it isn't a setting. */
+export const APP_NAME = 'Coil';
 export interface Rule {
   id: number; pattern: string; matchType: string; accountId: number | null; accountName: string | null; categoryId: number | null;
   categoryName: string | null; categoryColour: string | null; transferAccountId: number | null; transferAccountName: string | null;

@@ -493,7 +493,7 @@ function PayGuide({ month, onCreate, startOpen = false }: { month: string; onCre
                     <span className="dot" style={{ background: p.colour }} />
                     <span className="grow"><strong>{p.label}</strong> <span className="muted small">{pctText(g.split[p.key])} · {p.note}</span></span>
                     <span className={`small ${over ? (p.key === 'savings' ? 'tone-warn' : 'tone-bad') : 'muted'}`}>{money(actual)}{target != null && <> of {money(target)}</>}</span>
-                    {target != null && <span className="split-bar"><Progress value={actual} max={target} tone={over ? (p.key === 'savings' ? 'warn' : 'bad') : 'good'} /></span>}
+                    {target != null && <span className="rule-bar"><Progress value={actual} max={target} tone={over ? (p.key === 'savings' ? 'warn' : 'bad') : 'good'} /></span>}
                   </div>
                 );
               })}

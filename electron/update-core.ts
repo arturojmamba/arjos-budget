@@ -125,3 +125,12 @@ echo "$(date) updated"
 [ "$MODE" = "norelaunch" ] || open "$APP"
 `;
 }
+
+/** What to tell you when Windows wouldn't start the installer. */
+export function windowsBlockedReason(e: Error & { code?: string; errno?: number }): string {
+  const text = `${e.code ?? ''} ${e.message ?? ''}`;
+  if (/4551|policy|blocked|EPERM|EACCES|UNKNOWN/i.test(text)) {
+    return "Windows blocked the installer. This usually means Smart App Control is on: it blocks apps that don't have a paid code-signing certificate, and there's no way to allow just one app. Your data is safe and this version still works. To update, turn Smart App Control off (Windows Security → App & browser control → Smart App Control), click Restart to update again, then turn it back on.";
+  }
+  return `Windows couldn't start the installer (${e.message}). Your data is safe and this version still works.`;
+}

@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { Readable, Transform } from 'node:stream';
-import { type Available, latestRelease, macAppPath, macInstallScript, verifyDownload } from './update-core.ts';
+import { type Available, latestRelease, macAppPath, macInstallScript, verifyDownload, windowsBlockedReason } from './update-core.ts';
 
 export type UpdateState =
   | { status: 'idle' | 'checking' | 'none' }
@@ -112,7 +112,7 @@ export class Updater {
   }
 
   /** Back up, then hand over to the installer and quit. Returns a reason instead if it can't. */
-  install(opts: { relaunch?: boolean } = {}): { ok: true } | { ok: false; reason: string } {
+  async install(opts: { relaunch?: boolean } = {}): Promise<{ ok: true } | { ok: false; reason: string }> {
     if (this.state.status !== 'ready' || !this.file || !this.found) return { ok: false, reason: 'No update is ready yet.' };
     const relaunch = opts.relaunch !== false;
     if (process.platform === 'darwin') {
@@ -131,7 +131,21 @@ export class Updater {
     if (process.platform === 'win32') {
       this.beforeInstall();
       // Silent install over the current one; --force-run opens the app again afterwards.
-      spawn(this.file, relaunch ? ['/S', '--updated', '--force-run'] : ['/S', '--updated'], { detached: true, stdio: 'ignore' }).unref();
+      // Windows can refuse to start it (Smart App Control blocks apps without a code-signing
+      // certificate). Wait to see it start before quitting, so a refusal leaves the app open with
+      // an explanation instead of closed with nothing.
+      const child = spawn(this.file, relaunch ? ['/S', '--updated', '--force-run'] : ['/S', '--updated'], { detached: true, stdio: 'ignore' });
+      const started = await new Promise<true | Error>((resolve) => {
+        child.once('spawn', () => resolve(true));
+        child.once('error', (e) => resolve(e));
+      });
+      if (started !== true) {
+        this.log(`Installer didn't start: ${started.message}`);
+        const reason = windowsBlockedReason(started);
+        this.state = { status: 'manual', available: strip(this.found), reason };
+        return { ok: false, reason };
+      }
+      child.unref();
       return { ok: true };
     }
     return { ok: false, reason: 'Updates are for Mac and Windows.' };
@@ -149,3 +163,4 @@ function friendly(e: any): string {
   if (/fetch failed|ENOTFOUND|ECONN|network/i.test(m)) return "Couldn't reach GitHub. Check your internet connection.";
   return m;
 }
+
