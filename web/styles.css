@@ -246,7 +246,7 @@ textarea { resize: vertical; }
 .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; }
 .stat-label { font-size: 12.5px; color: var(--text-2); font-weight: 600; }
 .stat-value { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin: 4px 0 2px; white-space: nowrap; }
-.stat-sub { font-size: 12.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-sub { font-size: 12.5px; color: var(--text-3); line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .stat-action { display: flex; align-items: center; justify-content: center; background: transparent; border-style: dashed; box-shadow: none; }
 /*
  * Side-by-side cards. Layout rule for every page: cards next to each other end level (they
@@ -1615,3 +1615,34 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 .stat-hero-top { flex-wrap: wrap; justify-content: flex-start; row-gap: 4px; }
 .stat-hero-top .stat-label { white-space: nowrap; margin-right: auto; }
 @media (max-width: 1440px) { .stat-hero-rings .pace-rings { width: 78px; height: 78px; } .stat-hero-rings .pace-key { flex-direction: column; gap: 3px; align-items: flex-start; } }
+
+/* What's new. */
+.releases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.releases > li { padding: 14px 0; border-top: 1px solid var(--border); }
+.releases > li:first-child { border-top: 0; padding-top: 0; }
+.releases header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.releases header .small { margin-left: auto; }
+.releases ul { margin: 0; padding-left: 18px; color: var(--text-2); display: flex; flex-direction: column; gap: 3px; }
+
+/* Guide. */
+.guide { display: flex; flex-direction: column; gap: 18px; }
+.guide-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 18px; }
+.guide-steps > li { display: flex; gap: 14px; }
+.guide-steps h3 { margin: 3px 0 4px; font-size: 15px; }
+.guide-steps p { margin: 0 0 6px; color: var(--text-2); line-height: 1.55; }
+.guide-num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); display: grid; place-items: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+.guide-go { display: inline-flex; align-items: center; gap: 2px; }
+.guide-pages { display: flex; flex-direction: column; }
+.guide-page { border-top: 1px solid var(--border); }
+.guide-page:first-child { border-top: 0; }
+.guide-page summary { list-style: none; display: grid; grid-template-columns: 20px 130px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 12px 2px; cursor: pointer; }
+.guide-page summary::-webkit-details-marker { display: none; }
+.guide-page summary .muted { font-size: 13.5px; }
+.guide-page[open] .guide-chev { transform: rotate(180deg); }
+.guide-page ul { margin: 0 0 8px 32px; padding-left: 16px; color: var(--text-2); line-height: 1.55; display: flex; flex-direction: column; gap: 4px; }
+.guide-page .guide-go { margin: 0 0 12px 32px; }
+.guide-faq { margin: 0; display: flex; flex-direction: column; }
+.guide-faq dt { font-weight: 650; margin-top: 14px; }
+.guide-faq dt:first-child { margin-top: 0; }
+.guide-faq dd { margin: 4px 0 0; color: var(--text-2); line-height: 1.55; }
+@media (max-width: 760px) { .guide-page summary { grid-template-columns: 20px minmax(0, 1fr) 16px; } .guide-page summary .muted { grid-column: 2; } }

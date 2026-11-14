@@ -224,7 +224,8 @@ export function App() {
         <div className="overlay" onClick={() => setHelp(false)}>
           <div className="modal" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head"><h2>Keyboard shortcuts</h2><button className="icon-btn" onClick={() => setHelp(false)} aria-label="Close"><Icon name="x" /></button></div>
-            <div className="modal-body"><table className="shortcuts">{SHORTCUTS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}</table></div>
+            <div className="modal-body"><table className="shortcuts">{SHORTCUTS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}</table>
+              <p className="muted small" style={{ marginTop: 14 }}>New to Coil, or got a question? <button className="link-btn" onClick={() => { setHelp(false); navigate('/settings?tab=guide'); }}>Open the guide</button></p></div>
           </div>
         </div>
       )}

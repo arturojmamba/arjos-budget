@@ -2,7 +2,7 @@ import { PaceRings, PaceKey, paceTone, cycleProgress, lastPayday } from '../comp
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, qs, type Summary, type Plan, type Occurrence, type MonthSpending } from '../api.ts';
 import { money, monthLabel, pct, dayMonth, relativeDay, addMonths, shortDate, privateLabel, niceName } from '../format.ts';
-import { Badge, Card, Empty, Money, Stat, useApp, useData, Bubble, Progress } from '../components/ui.tsx';
+import { Badge, Card, Empty, Money, Stat, useApp, useData, Bubble, Progress, usePaged } from '../components/ui.tsx';
 import { Donut, IncomeSpendBars, Cumulative } from '../components/charts.tsx';
 import { GoalStrip } from './Goals.tsx';
 import { PaydayCard } from './Payday.tsx';
@@ -160,11 +160,23 @@ const GROUPS: { key: string; title: string; match: (a: Summary['accounts'][numbe
 ];
 
 /** Accounts grouped by what they are, each group with its own total. */
+/** An account list that pages when it's longer than `size`. */
+function PagedAccounts<T extends { id: number }>({ items, size, resetKey, children }: { items: T[]; size: number; resetKey: string; children: (a: T) => React.ReactNode }) {
+  const { rows, pager } = usePaged(items, size, resetKey);
+  return <><ul className="acct-mini">{rows.map(children)}</ul>{pager}</>;
+}
+
 function MoneyAndDebt({ s }: { s: Summary }) {
   const top = s.accounts.filter((a) => a.parentId === null);
   const children = (id: number) => s.accounts.filter((a) => a.parentId === id);
+  const rowsOf = (g: (typeof GROUPS)[number]) => Math.max(1, top.filter(g.match).reduce((n, a) => n + 1 + children(a.id).length, 0));
+  const counts = GROUPS.map((g) => ({ key: g.key, rows: rowsOf(g) })).sort((x, y) => y.rows - x.rows);
+  const restRows = counts.slice(1).reduce((n, c) => n + c.rows, 0);
+  // One long group beside two short ones leaves big gaps under the short ones: stack those instead,
+  // and page the long one so the card stays as tall as the stacked pair however many accounts you add.
+  const stack = counts[0].rows >= restRows + 1 ? counts[0].key : null;
+  const pageSize = Math.max(4, stack ? restRows + 1 : (counts[1]?.rows ?? 0) + 1);
   const groups = GROUPS.map((g) => {
-    const rows = top.filter(g.match).reduce((n, a) => n + 1 + children(a.id).length, 0);
     const el = (() => {
       const list = top.filter(g.match);
       const all = s.accounts.filter(g.match);
@@ -179,8 +191,8 @@ function MoneyAndDebt({ s }: { s: Summary }) {
               : <Money value={total} className="strong" />}
           </header>
           {list.length === 0 ? <p className="muted small">None yet</p> : (
-            <ul className="acct-mini">
-              {list.map((a) => (
+            <PagedAccounts items={list} size={g.key === counts[0].key ? pageSize : 999} resetKey={g.key}>
+              {(a) => (
                 <React.Fragment key={a.id}>
                   <li>
                     <button onClick={() => navigate(`/transactions${qs({ accountId: a.id })}`)}>
@@ -201,18 +213,14 @@ function MoneyAndDebt({ s }: { s: Summary }) {
                     </li>
                   ))}
                 </React.Fragment>
-              ))}
-            </ul>
+              )}
+            </PagedAccounts>
           )}
         </section>
       );
     })();
-    return { key: g.key, rows: Math.max(1, rows), el };
+    return { key: g.key, el };
   });
-  // One long group beside two short ones leaves big gaps under the short ones: stack those instead.
-  const longest = [...groups].sort((x, y) => y.rows - x.rows)[0];
-  const rest = groups.reduce((n, g) => n + g.rows, 0) - longest.rows;
-  const stack = longest.rows >= rest + 1 ? longest.key : null;
   return (
     <Card title="Money and debt" action={<span className="row gap"><span className="muted small">Net worth <Money value={s.netWorth} /></span><button className="link-btn" onClick={() => navigate('/accounts')}>Accounts</button></span>}>
       <div className={`money-groups ${stack ? 'stacked' : ''}`}>

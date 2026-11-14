@@ -102,7 +102,7 @@ function WeekTab({ week, onWeek }: { week: string | null; onWeek: (w: string | n
 
       <div className="stats">
         <Stat label="Spent" value={<Money value={data.spent} />} sub={<>{money(data.last.spent)} {lastLabel}</>} />
-        <Stat label="Day-to-day" value={<Money value={data.dayToDay} />} sub={data.typical ? <>Typical week {money(data.typical.dayToDay)}</> : 'Leaves out bills and rent'} />
+        <Stat label="Day-to-day" value={<Money value={data.dayToDay} />} sub={<>Everything except fixed costs{data.typical ? <> · typical week {money(data.typical.dayToDay)}</> : null}</>} />
         <Stat label="Bills and fixed costs" value={<Money value={data.fixed} />}
           sub={data.fixedOther > 0
             ? <>{data.fixedFromBills > 0 ? <><Money value={data.fixedFromBills} /> from bills · </> : null}<Money value={data.fixedOther} /> other fixed costs</>

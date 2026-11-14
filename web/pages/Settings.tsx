@@ -1,15 +1,17 @@
 import React, { useRef, useState } from 'react';
 import { api, APP_NAME, type Appearance } from '../api.ts';
 import { applyAppearance, Avatar } from '../App.tsx';
-import { Badge, Card, Field, Segmented, useApp, useConfirm, useData } from '../components/ui.tsx';
+import { Badge, Card, Field, Segmented, useApp, useConfirm, useData, usePaged } from '../components/ui.tsx';
 import { navigate, setParams, useRoute } from '../router.ts';
 import { Icon } from '../components/Icon.tsx';
 import { T212Card } from '../components/T212.tsx';
 import { AboutCard } from '../components/Updates.tsx';
+import { Guide } from './Guide.tsx';
+import { RELEASES } from '../changelog.ts';
 import { BrandMark } from '../components/BrandMark.tsx';
-import { money } from '../format.ts';
+import { money, shortDate } from '../format.ts';
 
-type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'notifications' | 'budgeting' | 'trading212' | 'data' | 'about';
+type TabKey = 'profile' | 'appearance' | 'display' | 'lock' | 'notifications' | 'budgeting' | 'trading212' | 'data' | 'about' | 'whatsnew' | 'guide';
 const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'profile', label: 'Profile', icon: 'heart', hint: 'Your name and picture' },
   { key: 'appearance', label: 'Appearance', icon: 'sparkles', hint: 'Theme, colour, text size and layout' },
@@ -20,6 +22,8 @@ const TABS: { key: TabKey; label: string; icon: string; hint: string }[] = [
   { key: 'trading212', label: 'Trading 212', icon: 'trending-up', hint: 'Sync status and permissions' },
   { key: 'data', label: 'Data', icon: 'archive', hint: 'Health checks, backups and export' },
   { key: 'about', label: 'About & updates', icon: 'info', hint: 'Version and updates' },
+  { key: 'whatsnew', label: "What's new", icon: 'sparkles', hint: 'Every version, what changed and when' },
+  { key: 'guide', label: 'Guide', icon: 'book', hint: 'How to set Coil up and use every page' },
 ];
 
 export function Settings() {
@@ -56,6 +60,8 @@ export function Settings() {
         {tab === 'trading212' && <T212Card />}
         {tab === 'data' && <><HealthPanel /><DataCard /></>}
         {tab === 'about' && <AboutCard />}
+        {tab === 'whatsnew' && <WhatsNew />}
+        {tab === 'guide' && <Guide />}
       </section>
     </div>
   );
@@ -481,5 +487,29 @@ function AppearanceCard() {
       </div>
     </Card>
     </>
+  );
+}
+
+/** Every version, newest first, ten at a time. */
+function WhatsNew() {
+  const { meta } = useApp();
+  const { rows, pager } = usePaged(RELEASES, 10, 'releases');
+  const installed = meta.desktop?.version ?? null;
+  return (
+    <Card>
+      <ol className="releases">
+        {rows.map((r) => (
+          <li key={r.version}>
+            <header>
+              <strong>Version {r.version}</strong>
+              {installed === r.version && <Badge tone="good">Installed</Badge>}
+              <span className="muted small">{shortDate(r.date)}</span>
+            </header>
+            <ul>{r.changes.map((c) => <li key={c}>{c}</li>)}</ul>
+          </li>
+        ))}
+      </ol>
+      {pager}
+    </Card>
   );
 }
