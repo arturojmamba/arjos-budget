@@ -5,7 +5,8 @@
  * The rules live here and nowhere else:
  *   - Shared bills count your share only (other people's payments are refunds against the bill).
  *   - Savings are your recurring savings plus your goals' monthly amounts, with no goal counted
- *     twice; a saving is done when the money arrives in its account.
+ *     twice; a saving is done when new money arrives in its account (from an everyday account,
+ *     not moved from another savings account).
  *   - Debt repayments are their own series.
  *   - The window is the funded month; money moved just after the payday that funds it counts.
  *   - Each bill knows which budget covers it (Payday counts it inside that budget).
@@ -13,7 +14,9 @@
 import { type DB } from './db.ts';
 import { addDays, addMonths, daysInMonth, todayIso } from './dates.ts';
 import { occurrences, monthlyEquivalent, type Occurrence, type RecurringType, type Frequency } from './recurring.ts';
-import { monthTotals } from './queries.ts';
+import { monthTotals, SAVINGS_TYPES } from './queries.ts';
+
+const SAV = SAVINGS_TYPES.map((t) => `'${t}'`).join(',');
 import { isLiability } from './ledger.ts';
 import { listGoals } from './goals.ts';
 import { listBudgets } from './budgets.ts';
@@ -37,7 +40,22 @@ export interface PlanItem {
 }
 export interface PlanSeries { planned: number; done: number; remaining: number; items: PlanItem[] }
 
-/** Money moved into an account (from any other account) between two dates. */
+/**
+ * New money saved into an account between two dates: transfers in from everyday accounts (current,
+ * cash, cards) less transfers back out to them. Moving between your own savings and investment
+ * accounts (say Chase to Trading 212) is neither, the same rule as SAVED_SQL everywhere else.
+ */
+export function savedInto(db: DB, accountId: number, from: string, to: string): number {
+  const r = db.prepare(
+    `SELECT IFNULL(SUM(p.amount), 0) AS n FROM postings p JOIN transactions t ON t.id = p.transaction_id
+     WHERE p.account_id = ? AND t.kind = 'transfer' AND t.date BETWEEN ? AND ?
+       AND EXISTS (SELECT 1 FROM postings p2 JOIN accounts a2 ON a2.id = p2.account_id
+                   WHERE p2.transaction_id = t.id AND p2.account_id != p.account_id AND a2.type NOT IN (${SAV}))`,
+  ).get(accountId, from, to) as { n: number };
+  return Math.max(0, r.n);
+}
+
+/** Money moved into an account (from any other account) between two dates: for debts and cards, where any source counts. */
 export function movedInto(db: DB, accountId: number, from: string, to: string) {
   return db.prepare(
     `SELECT IFNULL(SUM(p.amount), 0) AS amount, MAX(t.date) AS last FROM postings p JOIN transactions t ON t.id = p.transaction_id
@@ -53,8 +71,9 @@ export function fundingWindow(db: DB, month: string): { from: string; to: string
   if (!pay) return { from: first, to: last };
   const before = paydayIn(addMonths(month, -1), pay);
   const inMonth = paydayIn(month, pay);
-  const from = fundedMonth(db, before) === month ? addDays(before, -3) : first;
-  const to = fundedMonth(db, inMonth) !== month ? addDays(inMonth, -4) : last;
+  // From the day before the payday that funds it (pay sometimes lands a day early) to two days before the next.
+  const from = fundedMonth(db, before) === month ? addDays(before, -1) : first;
+  const to = fundedMonth(db, inMonth) !== month ? addDays(inMonth, -2) : last;
   return { from, to };
 }
 
@@ -113,7 +132,7 @@ export function plan(db: DB, month: string, today = todayIso()) {
   const arrived = new Map<number, number>();
   for (const s of savingItems) {
     if (s.accountId == null) continue;
-    if (!arrived.has(s.accountId)) arrived.set(s.accountId, movedInto(db, s.accountId, win.from, win.to).amount);
+    if (!arrived.has(s.accountId)) arrived.set(s.accountId, savedInto(db, s.accountId, win.from, win.to));
     const left = arrived.get(s.accountId)!;
     s.done = Math.min(s.amount, left);
     s.paid = s.done >= s.amount && s.amount > 0;

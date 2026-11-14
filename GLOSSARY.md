@@ -48,6 +48,10 @@ _Avoid_: Budget (budgets are limits on everyday spending), schedule
 Bills and subscriptions plus savings plus debt repayments in a Plan, counting only your share of shared bills.
 _Avoid_: Fixed costs (that's a category marking), outgoings
 
+**Saved**:
+New money moved into a savings or investment account from an everyday account (current account, cash or card), less any moved back out to one. Moving between two savings or investment accounts is not saving.
+_Avoid_: Moved (any transfer), deposited
+
 **Free to spend**:
 What's left of a month's income after what's committed and what's already been spent day to day.
 _Avoid_: Left over, disposable income, buffer

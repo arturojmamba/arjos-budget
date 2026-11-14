@@ -3,6 +3,14 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.15.1",
+    "date": "2026-11-14",
+    "changes": [
+      "Savings moved this month counts only new money: moving between your own savings and investment accounts (say Chase to Trading 212) no longer counts as saving",
+      "Money saved just before payday counts towards the month it came from, not the next one"
+    ]
+  },
+  {
     "version": "1.15.0",
     "date": "2026-11-14",
     "changes": [

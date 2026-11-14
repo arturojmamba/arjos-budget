@@ -80,3 +80,20 @@ test('the Bills page monthly figures come from the plan, with savings and debts 
   assert.equal(m.debts, 28500);
   assert.equal(m.savings, 0, 'goals aren’t regular items in Bills and income');
 });
+
+test('savings count new money only: moving between your own savings accounts is not saving, and October money stays in October', () => {
+  const { db, northbank, harbour, cat } = setup();
+  const acc = (n: string) => (db.prepare('SELECT id FROM accounts WHERE name = ?').get(n) as { id: number }).id;
+  const isa = acc('Trading 212 ISA');
+  createGoal(db, { name: 'ISA', accountId: isa, mode: 'rest', monthlyTarget: 7500 } as any);
+  const move = (date: string, from: number, to: number, amount: number) =>
+    createTransaction(db, simpleToPostings({ kind: 'transfer', date, description: 'Move', accountId: from, toAccountId: to, amount }));
+  move('2026-10-27', northbank, harbour, 5000); // from October's pay, before the 30 October payday
+  move('2026-10-31', northbank, isa, 7500);      // £75 put in after payday, for November
+  move('2026-11-05', harbour, isa, 10000);       // £100 moved from savings to the ISA: not new saving
+  const p = plan(db, '2026-11', '2026-11-14');
+  assert.equal(p.savings.done, 7500, 'only the £75 of new money');
+  assert.equal(p.savings.items.find((s) => s.name === 'ISA')!.done, 7500);
+  assert.equal(p.savings.items.find((s) => s.name === 'Emergency fund')!.done, 0, 'moving £100 out of it to the ISA isn’t saving into it either');
+  void cat;
+});

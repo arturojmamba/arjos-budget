@@ -15,7 +15,7 @@ import { ValidationError, assertPence, perMonth } from './money.ts';
 import { addDays, addMonths, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
 import { yourPay, paydayIn, paydayOnOrBefore, payCycle, cycleFrom, fundedMonth } from './paycycle.ts';
 import { listRecurring } from './recurring.ts';
-import { plan as planFor, movedInto } from './plan.ts';
+import { plan as planFor, movedInto, savedInto } from './plan.ts';
 import { listBudgets } from './budgets.ts';
 import { listGoals } from './goals.ts';
 import { listDebts } from './debts.ts';
@@ -117,12 +117,13 @@ export function payday(db: DB, cycleIn?: string | null, today = todayIso()) {
   plan.buffer = plan.pay - plan.bills.total - plan.debts.total - plan.savings.total - plan.budgets.total;
 
   // 4. Moves: transfers to make, ticked off when they appear in an import.
-  const from = addDays(cycle, -3);
+  const from = addDays(cycle, -1); // pay sometimes lands a day early
   const moves: { key: string; kind: 'goal' | 'saving' | 'debt' | 'card'; title: string; to: string; amount: number; due: string | null; status: 'done' | 'partial' | 'waiting' | 'skipped'; moved: number; movedOn: string | null; note: string | null }[] = [];
   const status = (key: string, amount: number, moved: number) => (done.has(`skip:${key}`) ? 'skipped' : moved >= amount * 0.95 ? 'done' : moved > 0 ? 'partial' : 'waiting');
   for (const sv of savingItems) {
     if (!sv.accountId) continue;
-    const m = movedInto(db, sv.accountId, from, windowEnd);
+    const saved = savedInto(db, sv.accountId, from, windowEnd);
+    const m = { amount: saved, last: saved > 0 ? (movedInto(db, sv.accountId, from, windowEnd).last) : null };
     moves.push({ key: sv.key, kind: sv.key.startsWith('goal') ? 'goal' : 'saving', title: `${sv.icon ? `${sv.icon} ` : ''}${sv.name}`, to: sv.accountName, amount: sv.amount, due: null, status: status(sv.key, sv.amount, m.amount), moved: m.amount, movedOn: m.last, note: null });
   }
   for (const d of debtItems) {
