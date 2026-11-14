@@ -57,10 +57,13 @@ export function Bills() {
       )}
 
       <div className="grid-main">
-        <Card title={day ? `Due ${shortDate(day)}` : `Rest of ${monthLabel(meta.currentMonth)}`} pad={false}
-          action={day
-            ? <button className="link-btn" onClick={() => setDay(null)}>Show the rest of the month</button>
-            : <span className="muted small">{money(leftOut)} still to go out</span>}>
+        <Card className="fit-row" title={day ? `Due ${shortDate(day)}` : `Rest of ${monthLabel(meta.currentMonth)}`} pad={false}
+          action={<span className="due-head-actions">
+            {day
+              ? <button className="link-btn" onClick={() => setDay(null)}>Show the rest of the month</button>
+              : <span className="muted small">{money(leftOut)} still to go out</span>}
+            <button className="btn btn-sm btn-primary" onClick={() => setEditing({})}><Icon name="plus" size={14} /> Add</button>
+          </span>}>
           {upcoming.length === 0 ? (
             day
               ? <Empty icon="calendar" title="Nothing due that day" />
@@ -68,7 +71,7 @@ export function Bills() {
                 ? <Empty icon="calendar" title="Nothing due">Add your bills, subscriptions and salary to see what's coming.</Empty>
                 : <Empty icon="check" title="All done for this month">Nothing else is due before the end of {monthLabel(meta.currentMonth)}.</Empty>
           ) : (
-            <ul className="due-list">
+            <ul className="due-list fit-scroll">
               {upcoming.map((o) => {
                 const dm = dayMonth(o.dueDate);
                 const done = o.status === 'paid' || o.status === 'skipped';
@@ -92,14 +95,12 @@ export function Bills() {
           )}
         </Card>
 
-        <div className="stack">
-          <BillCalendar today={meta.today} current={meta.currentMonth} selected={day} onSelect={(d) => setDay(d === day ? null : d)} />
-          <Card title="This month">
-            <PlanBreakdown plan={plan} />
-          </Card>
-          <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing({})}><Icon name="plus" size={16} /> Add bill, subscription or income</button>
-        </div>
+        <BillCalendar today={meta.today} current={meta.currentMonth} selected={day} onSelect={(d) => setDay(d === day ? null : d)} />
       </div>
+
+      <Card title="This month" className="plan-wide">
+        <PlanBreakdown plan={plan} />
+      </Card>
 
       {groups.map((g) => {
         const list = items.filter((i) => i.type === g.type);
@@ -201,7 +202,7 @@ export function PlanBreakdown({ plan }: { plan: Plan }) {
       </div>
       <ul className="plan-list">
         {parts.map((p) => (
-          <li key={p.label}><i style={{ background: p.colour }} /><span className="grow">{p.label}{p.sub && <span className="muted small"> · {p.sub}</span>}</span><Money value={p.value} /></li>
+          <li key={p.label}><i style={{ background: p.colour }} /><span className="grow">{p.label}{p.sub && <span className="muted small plan-sub">{p.sub}</span>}</span><Money value={p.value} /></li>
         ))}
         <li className="plan-free"><i style={{ background: free >= 0 ? 'var(--good)' : 'var(--bad)' }} /><span className="grow"><strong>{privateLabel(free >= 0, 'Free to spend', 'Over budget', 'After bills and spending')}</strong></span><Money value={Math.abs(free)} className={free >= 0 ? 'tone-good strong' : 'tone-bad strong'} /></li>
       </ul>

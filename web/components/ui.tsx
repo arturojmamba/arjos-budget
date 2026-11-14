@@ -213,3 +213,22 @@ export function Stat({ label, value, sub, tone }: { label: string; value: React.
 }
 
 export { money };
+
+/** Paging for a list inside a card: "11–20 of 23" with previous / next arrows. Hidden when it all fits. */
+export function usePaged<T>(list: T[], size: number, resetKey: string) {
+  const [page, setPage] = React.useState(0);
+  React.useEffect(() => setPage(0), [resetKey]);
+  const pages = Math.max(1, Math.ceil(list.length / size));
+  const at = Math.min(page, pages - 1);
+  const rows = list.slice(at * size, (at + 1) * size);
+  const pager = pages > 1 ? (
+    <nav className="card-pager" aria-label="Pages">
+      <span className="muted small">{at * size + 1}–{at * size + rows.length} of {list.length}</span>
+      <span className="row">
+        <button className="icon-btn" onClick={() => setPage(at - 1)} disabled={at === 0} aria-label={`Previous ${size}`}><Icon name="chevron-left" size={16} /></button>
+        <button className="icon-btn" onClick={() => setPage(at + 1)} disabled={at >= pages - 1} aria-label={`Next ${size}`}><Icon name="chevron-right" size={16} /></button>
+      </span>
+    </nav>
+  ) : null;
+  return { rows, pager };
+}

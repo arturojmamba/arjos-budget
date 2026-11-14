@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api.ts';
 import { money, monthLabel, pct, shortDate, amountsHidden } from '../format.ts';
-import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useData } from '../components/ui.tsx';
+import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useData, usePaged } from '../components/ui.tsx';
 import { IncomeSpendBars } from '../components/charts.tsx';
 import { LineChart, Spark, StackedBars, Waterfall, useHidden } from '../components/viz.tsx';
 import { Icon } from '../components/Icon.tsx';
@@ -1024,13 +1024,7 @@ const BREAKDOWN_PAGE = 10;
 
 /** The breakdown table, ten rows at a time, biggest first, with arrows for the rest. */
 function BreakdownTable({ data, hidden, drill }: { data: any; hidden: Set<string>; drill: (d: any) => void }) {
-  const [page, setPage] = useState(0);
-  const keys = data.series.map((s: any) => s.key).join('|');
-  useEffect(() => setPage(0), [keys]);
-  const pages = Math.max(1, Math.ceil(data.series.length / BREAKDOWN_PAGE));
-  const at = Math.min(page, pages - 1);
-  const rows = data.series.slice(at * BREAKDOWN_PAGE, (at + 1) * BREAKDOWN_PAGE);
-  const from = at * BREAKDOWN_PAGE + 1, to = at * BREAKDOWN_PAGE + rows.length;
+  const { rows, pager } = usePaged<any>(data.series, BREAKDOWN_PAGE, data.series.map((s: any) => s.key).join('|'));
   return (
     <>
     <table className="report-table breakdown">
@@ -1048,15 +1042,7 @@ function BreakdownTable({ data, hidden, drill }: { data: any; hidden: Set<string
         ))}
       </tbody>
     </table>
-      {pages > 1 && (
-        <nav className="breakdown-pager" aria-label="Breakdown pages">
-          <span className="muted small">{from}–{to} of {data.series.length}</span>
-          <span className="row">
-            <button className="icon-btn" onClick={() => setPage(at - 1)} disabled={at === 0} aria-label="Previous 10"><Icon name="chevron-left" size={16} /></button>
-            <button className="icon-btn" onClick={() => setPage(at + 1)} disabled={at >= pages - 1} aria-label="Next 10"><Icon name="chevron-right" size={16} /></button>
-          </span>
-        </nav>
-      )}
+      {pager}
     </>
   );
 }

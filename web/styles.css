@@ -206,8 +206,8 @@ textarea { resize: vertical; }
 .page { display: flex; flex-direction: column; gap: 18px; width: 100%; max-width: 1200px; margin: 0 auto; }
 .topbar { max-width: 1200px; margin-left: auto; margin-right: auto; }
 /* Two columns on wide screens, one on narrow. Each column is a stack of cards. */
-.cols-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: start; }
-.cols-main-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: start; }
+.cols-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.cols-main-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .side-sticky { display: flex; flex-direction: column; gap: 18px; }
 @media (min-width: 1280px) {
   .cols-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -228,8 +228,19 @@ textarea { resize: vertical; }
 .stat-value { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin: 4px 0 2px; white-space: nowrap; }
 .stat-sub { font-size: 12.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-action { display: flex; align-items: center; justify-content: center; background: transparent; border-style: dashed; box-shadow: none; }
-.grid-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
-.grid-2-cards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+/*
+ * Side-by-side cards. Layout rule for every page: cards next to each other end level (they
+ * stretch to the row's height), and no card grows the row without limit. A list that can get long
+ * either pages (usePaged), caps itself ("Show all"), or sits in a .fit-row card: one that takes the
+ * height of the row it's in and scrolls inside, so its neighbour sets the height. Never leave a
+ * short card next to a tall one with empty page below it.
+ */
+.grid-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.grid-2-cards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.grid-main > .card, .grid-2-cards > .card { min-width: 0; }
+/* Takes the row's height from its neighbour and scrolls inside (needs a .fit-scroll child). */
+.fit-row { contain: size; min-height: 360px; display: flex; flex-direction: column; }
+.fit-row > .fit-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .welcome { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
 .welcome h2 { font-size: 18px; margin-bottom: 4px; }
 
@@ -537,7 +548,7 @@ input[type=radio] { width: 16px; height: 16px; accent-color: var(--accent); marg
 .budget-mini .progress { height: 5px; }
 
 
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 18px; align-items: start; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 18px; align-items: stretch; }
 .side-cats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .side-cats li { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; font-size: 13px; }
 .side-cats li .progress { grid-column: 2 / -1; height: 5px; }
@@ -1006,14 +1017,14 @@ kbd { font: 600 11.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding
 /* Investing */
 .inv-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .inv-title { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
-.inv-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.inv-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .alloc { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
 .alloc-list { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 6px; }
 .alloc-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; min-width: 0; }
 .alloc-list i { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
 .alloc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
 .alloc-pct { font-variant-numeric: tabular-nums; color: var(--text-2); }
-.pie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; align-items: start; }
+.pie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; align-items: stretch; }
 .pie-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .pie-nums > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--surface-2); border-radius: 12px; min-width: 0; }
 .pie-goal { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
@@ -1151,7 +1162,7 @@ kbd { font: 600 11.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding
 .sizes td { white-space: nowrap; }
 
 /* Budget track record */
-.budget-rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; align-items: start; }
+.budget-rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; align-items: stretch; }
 .budget-rec-text { margin: 10px 0 6px; line-height: 1.5; }
 
 /* Payday to payday */
@@ -1441,12 +1452,29 @@ button.viz-key:hover { background: var(--surface-2); color: var(--text); }
 .update-notes li.plain { list-style: none; margin-left: -20px; font-weight: 600; }
 .update-status p { margin: 0; }
 .pref-sub { margin-top: 8px; }
-.breakdown-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 10px 20px; border-top: 1px solid var(--border); }
-.breakdown-pager .row { gap: 4px; }
-.breakdown-pager .icon-btn { border: 1px solid var(--border); }
-.breakdown-pager .icon-btn:disabled { opacity: 0.4; cursor: default; }
+.card-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 10px 20px; border-top: 1px solid var(--border); }
+.card-pager .row { gap: 4px; }
+.card-pager .icon-btn { border: 1px solid var(--border); }
+.card-pager .icon-btn:disabled { opacity: 0.4; cursor: default; }
 .settings-credit { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 12px 12px 0; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
 .settings-credit strong { font-family: var(--brand-font); font-weight: 650; color: var(--text); font-size: 14px; }
 .brand-mark-sm { width: 20px; height: 20px; display: block; flex-shrink: 0; }
 @media (max-width: 860px) { .settings-credit { display: none; } }
 .about-credit { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border); }
+@media (max-width: 1100px) {
+  .fit-row { contain: none; min-height: 0; }
+  .fit-row > .fit-scroll { max-height: 480px; }
+}
+/* "This month" across the full width: the parts side by side. */
+.plan-wide .plan-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 24px; }
+.plan-wide .plan-list li { display: grid; grid-template-columns: 10px minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 2px; border: none; padding: 0; margin: 0; }
+.plan-wide .plan-list li > .grow { grid-column: 2; }
+.plan-wide .plan-list li > :last-child { grid-column: 2; font-size: 17px; font-weight: 650; }
+.due-head-actions { display: flex; align-items: center; gap: 12px; }
+.plan-sub::before { content: ' · '; }
+.plan-wide .plan-sub { display: block; }
+.plan-wide .plan-sub::before { content: none; }
+:is(.grid-main, .grid-2-cards, .cols-2, .cols-main-side, .inv-grid, .pie-grid, .budget-rec-grid, .settings-grid) > .card { display: flex; flex-direction: column; }
+:is(.grid-main, .grid-2-cards, .cols-2, .cols-main-side, .inv-grid, .pie-grid, .budget-rec-grid, .settings-grid) > .card > .card-pager { margin-top: auto; }
+/* A column of cards next to a taller card: the last one fills the rest, so both sides end level. */
+:is(.grid-main, .grid-2-cards, .cols-2, .cols-main-side, .inv-grid) > .stack > .card:last-child { flex: 1 1 auto; }

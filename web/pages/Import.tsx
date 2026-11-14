@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { api } from '../api.ts';
 import { money, shortDate } from '../format.ts';
-import { AccountSelect, Badge, Card, CategorySelect, Empty, Field, Modal, Money, Segmented, useApp, useConfirm, useData } from '../components/ui.tsx';
+import { AccountSelect, Badge, Card, CategorySelect, Empty, Field, Modal, Money, Segmented, useApp, useConfirm, useData, usePaged } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 
@@ -386,6 +386,8 @@ function ImportHistory() {
   const { refresh, toast } = useApp();
   const { data } = useData<ImportRecord[]>(() => api.get('/api/imports'), []);
   const [confirm, confirmNode] = useConfirm();
+  const [open, setOpen] = useState(false);
+  const { rows, pager } = usePaged(data ?? [], 8, String(data?.length ?? 0));
   if (!data || data.length === 0) return null;
   async function undo(b: ImportRecord) {
     if (!(await confirm(`Undo this import? The ${b.created} transactions it created will be deleted. Rows it linked to existing transactions stay linked.`))) return;
@@ -394,9 +396,10 @@ function ImportHistory() {
     refresh();
   }
   return (
-    <Card title="Recent imports" pad={false}>
-      <ul className="cat-manage">
-        {data.map((b) => (
+    <Card title={`Recent imports (${data.length})`} pad={false}
+      action={<button className="link-btn" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? 'Hide recent imports' : 'Show recent imports'}</button>}>
+      {open && <><ul className="cat-manage">
+        {rows.map((b) => (
           <li key={b.id}>
             <Icon name="file" size={16} />
             <span className="grow">{b.filename ?? 'Import'} <span className="muted small">→ {b.accountName}</span></span>
@@ -405,6 +408,7 @@ function ImportHistory() {
           </li>
         ))}
       </ul>
+      {pager}</>}
       {confirmNode}
     </Card>
   );
