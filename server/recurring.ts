@@ -6,7 +6,7 @@
  * when it appears — imported or entered by hand — and recorded in
  * recurring_payments. Due dates without a match are upcoming or overdue.
  */
-import { type DB, tx, getSetting } from './db.ts';
+import { type DB, tx, getSetting, setSetting } from './db.ts';
 import { ValidationError, assertPence } from './money.ts';
 import { addDays, addMonths, daysBetween, daysInMonth, isIsoDate, monthOf, todayIso } from './dates.ts';
 import { lastWorkingDay } from './calendar.ts';
@@ -573,14 +573,36 @@ export function monthPlan(db: DB, month: string) {
 // ---------------------------------------------------------------------------
 // Suggestions: spot regular payments in your history
 
+/** Suggestions you've said aren't regular: account|kind|merchant keys. */
+const DISMISSED_KEY = 'recurring_dismissed';
+export const suggestionKey = (accountId: number, kind: string, merchant: string) => `${accountId}|${kind}|${merchant}`;
+export function dismissSuggestion(db: DB, key: string) {
+  if (typeof key !== 'string' || !key.includes('|')) throw new ValidationError('Missing suggestion');
+  const list = new Set<string>(JSON.parse(getSetting(db, DISMISSED_KEY, '[]')));
+  list.add(key);
+  setSetting(db, DISMISSED_KEY, JSON.stringify([...list].slice(-500)));
+}
+/** Income categories that are regular pay. */
+const REGULAR_INCOME = /salary|wage|pay\b|pension|benefit|universal credit|stipend|allowance/i;
+
+/**
+ * Regular payments in your history that aren't tracked yet. Two ways in:
+ * - a pattern: three or more payments to the same place at a steady interval;
+ * - a category: anything in a Fixed category (Subscriptions, Bills & Utilities, Rent / Housing or
+ *   their subcategories), or regular-pay income like Salary, even after one payment. These are
+ *   recurring by nature, so you shouldn't have to wait for three of them.
+ */
 export function suggestRecurring(db: DB) {
   const since = addDays(todayIso(), -200);
   const rows = db.prepare(
-    `SELECT t.id, t.date, t.description, t.merchant, t.kind, p.account_id, p.category_id, p.amount
+    `SELECT t.id, t.date, t.description, t.merchant, t.kind, p.account_id, p.category_id, p.amount,
+            COALESCE(c.is_fixed, 0) OR COALESCE(pc.is_fixed, 0) AS fixed, COALESCE(c.name, '') AS cat_name, COALESCE(pc.name, '') AS parent_name
      FROM transactions t JOIN postings p ON p.transaction_id = t.id
-     WHERE t.kind IN ('expense','income') AND t.date >= ? AND t.merchant != ''
+     LEFT JOIN categories c ON c.id = p.category_id LEFT JOIN categories pc ON pc.id = c.parent_id
+     WHERE t.kind IN ('expense','income') AND t.date >= ? AND t.merchant != '' AND p.category_id IS NOT NULL
      ORDER BY t.date`,
   ).all(since) as any[];
+  const dismissed = new Set<string>(JSON.parse(getSetting(db, DISMISSED_KEY, '[]')));
   const existing = db.prepare('SELECT * FROM recurring').all() as unknown as RecurringRow[];
   const groups = new Map<string, any[]>();
   for (const r of rows) {
@@ -590,14 +612,23 @@ export function suggestRecurring(db: DB) {
   }
   const out = [];
   for (const list of groups.values()) {
-    if (list.length < 3) continue;
+    const lastRow0 = list[list.length - 1];
+    // Money the wrong way round isn't a bill or pay: a refund, or a friend paying back their share.
+    if ((lastRow0.kind === 'expense' && lastRow0.amount > 0) || (lastRow0.kind === 'income' && lastRow0.amount < 0)) continue;
+    if (dismissed.has(suggestionKey(lastRow0.account_id, lastRow0.kind, lastRow0.merchant))) continue;
+    const byCategory = lastRow0.kind === 'income' ? REGULAR_INCOME.test(lastRow0.cat_name) || REGULAR_INCOME.test(lastRow0.parent_name) : !!lastRow0.fixed;
+    // Only recent payments count for a category suggestion: something you stopped paying months ago isn't a bill now.
+    if (byCategory && daysBetween(lastRow0.date, todayIso()) > 70) continue;
+    if (list.length < 3 && !byCategory) continue;
     const months = new Set(list.map((r) => monthOf(r.date)));
     const gaps = list.slice(1).map((r, i) => daysBetween(list[i].date, r.date)).sort((a, b) => a - b);
-    const gap = gaps[Math.floor(gaps.length / 2)];
+    const gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
     let frequency: Frequency | null = null;
-    if (gap >= 26 && gap <= 35 && months.size >= 3) frequency = 'monthly';
-    else if (gap >= 6 && gap <= 8 && list.length >= 4) frequency = 'weekly';
-    else if (gap >= 13 && gap <= 15 && list.length >= 4) frequency = 'fortnightly';
+    if (gap >= 26 && gap <= 35 && (months.size >= 3 || byCategory)) frequency = 'monthly';
+    else if (gap >= 6 && gap <= 8 && (list.length >= 4 || byCategory)) frequency = 'weekly';
+    else if (gap >= 13 && gap <= 15 && (list.length >= 4 || byCategory)) frequency = 'fortnightly';
+    else if (gap >= 350 && gap <= 380 && byCategory) frequency = 'annually';
+    else if (byCategory) frequency = 'monthly'; // one payment so far: most bills are monthly; you can change it
     if (!frequency) continue;
     // Regular payments have stable amounts; groceries don't.
     const amounts = list.map((r) => Math.abs(r.amount));
@@ -605,12 +636,22 @@ export function suggestRecurring(db: DB) {
     const spread = (Math.max(...amounts) - Math.min(...amounts)) / Math.max(1, lastAmount);
     const variable = spread > 0.25;
     if (variable && frequency !== 'monthly') continue;
+    // Visiting the same shop or restaurant often, at different amounts, is habit, not a bill.
+    if (variable && !byCategory && lastRow0.kind === 'expense') continue;
     if (variable && list.length > months.size + 1) continue; // several per month at varying amounts = everyday spending
     const lastRow = list[list.length - 1];
     if (existing.some((e) => e.account_id === lastRow.account_id && matchesPattern(e, lastRow))) continue;
     const accType = (db.prepare('SELECT type FROM accounts WHERE id = ?').get(lastRow.account_id) as { type: string }).type;
     const cat = lastRow.category_id ? (db.prepare('SELECT name, is_fixed FROM categories WHERE id = ?').get(lastRow.category_id) as any) : null;
+    // Pay that lands in the last few days of the month is paid on the last working day.
+    const monthEnd = lastRow.kind === 'income' && frequency === 'monthly' && list.every((r) => {
+      const d = new Date(r.date + 'T00:00:00Z'); const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+      return last - d.getUTCDate() <= 4;
+    });
     out.push({
+      key: suggestionKey(lastRow.account_id, lastRow.kind, lastRow.merchant),
+      source: (list.length >= 3 && !byCategory ? 'pattern' : 'category') as 'pattern' | 'category',
+      schedule: monthEnd ? 'last_working_day' : 'fixed',
       name: titleCase(lastRow.merchant),
       matchPattern: lastRow.merchant.toLowerCase(),
       type: (lastRow.kind === 'income' ? 'income' : cat?.name === 'Subscriptions' ? 'subscription' : 'bill') as RecurringType,

@@ -1,7 +1,7 @@
 import { UpdateBanner } from './components/Updates.tsx';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type Account, type Appearance, type Category, type Meta, type Profile, APP_NAME } from './api.ts';
-import { AppContext } from './components/ui.tsx';
+import { AppContext, useCurrentPageAdd } from './components/ui.tsx';
 import { Icon } from './components/Icon.tsx';
 import { TransactionForm } from './components/TransactionForm.tsx';
 import { useRoute, navigate, setParams } from './router.ts';
@@ -68,6 +68,7 @@ export function App() {
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: 'ok' | 'error' }[]>([]);
   const [fatal, setFatal] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const pageAdd = useCurrentPageAdd();
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('finance.hidden') === '1'; } catch { return false; } });
   // Set before children render so every money() call this pass sees it.
   setAmountsHidden(hidden);
@@ -179,7 +180,7 @@ export function App() {
               aria-label={hidden ? 'Show balances' : 'Hide balances'} title={`${hidden ? 'Show' : 'Hide'} balances (H)`}>
               <Icon name={hidden ? 'eye-off' : 'eye'} size={19} />
             </button>
-            <button className="btn btn-primary add-btn" onClick={() => setAdding(true)} title="Add transaction (N)"><Icon name="plus" size={16} /> <span>Add</span></button>
+            <button className="btn btn-primary add-btn" onClick={() => (pageAdd ? pageAdd.run() : setAdding(true))} title={pageAdd ? pageAdd.label : 'Add transaction (N)'} aria-label={pageAdd ? pageAdd.label : 'Add transaction'}><Icon name="plus" size={16} /> <span>{pageAdd ? pageAdd.label : 'Add transaction'}</span></button>
           </header>
 
           {page.path === '/' && <Overview month={month} />}

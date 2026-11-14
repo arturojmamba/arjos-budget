@@ -151,7 +151,7 @@ export function CategorySelect({ value, onChange, kind, allowNone = true, noneLa
   const { categories } = useApp();
   const groups: ('expense' | 'income')[] = kind ? [kind] : ['expense', 'income'];
   return (
-    <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+    <select id={id} aria-label={id ? undefined : 'Category'} value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
       {allowNone && <option value="">{noneLabel}</option>}
       {groups.map((k) => (
         <optgroup key={k} label={k === 'expense' ? 'Spending' : 'Income'}>
@@ -176,7 +176,7 @@ export function AccountSelect({ value, onChange, exclude, allowAll, allLabel = '
   const { accounts } = useApp();
   const list = accounts.filter((a) => a.id !== exclude && (!filter || filter(a)));
   return (
-    <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+    <select id={id} aria-label={id ? undefined : 'Account'} value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
       {allowAll ? <option value="">{allLabel}</option> : value == null && <option value="">Choose an account…</option>}
       <optgroup label="Money">
         {list.filter((a) => !a.isLiability).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -267,4 +267,33 @@ export function useFitRows(total: number, fallback: number, { pagerHeight = 52, 
     return () => ro.disconnect();
   }, [total, fallback, pagerHeight, min]);
   return { ref, size };
+}
+
+
+/**
+ * The top-right Add button follows the page: Bills adds a bill, Budgets a budget, and so on. A page
+ * registers its own "add" with usePageAdd; anywhere else the button adds a transaction.
+ */
+type PageAdd = { label: string; run: () => void };
+let pageAdd: PageAdd | null = null;
+const pageAddListeners = new Set<() => void>();
+const announcePageAdd = () => pageAddListeners.forEach((f) => f());
+export function usePageAdd(label: string, run: () => void) {
+  const latest = useRef(run);
+  latest.current = run;
+  useEffect(() => {
+    const me: PageAdd = { label, run: () => latest.current() };
+    pageAdd = me;
+    announcePageAdd();
+    return () => { if (pageAdd === me) { pageAdd = null; announcePageAdd(); } };
+  }, [label]);
+}
+export function useCurrentPageAdd(): PageAdd | null {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump((n) => n + 1);
+    pageAddListeners.add(f);
+    return () => { pageAddListeners.delete(f); };
+  }, []);
+  return pageAdd;
 }

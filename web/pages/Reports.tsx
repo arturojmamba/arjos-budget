@@ -41,7 +41,7 @@ export function Reports({ params }: { params: URLSearchParams }) {
 
 interface WeekData {
   from: string; to: string; upTo: string; current: boolean; elapsed: number; previousWeek: string; nextWeek: string | null; isLastWeek: boolean; isFirstWeek: boolean;
-  spent: number; dayToDay: number; fixed: number; income: number; saved: number; count: number;
+  spent: number; dayToDay: number; fixed: number; fixedFromBills: number; fixedOther: number; income: number; saved: number; count: number;
   last: { spent: number; dayToDay: number; sameDays: boolean; fullWeek: number };
   typical: { spent: number; dayToDay: number; weeks: number } | null;
   days: { date: string; label: string; spent: number; count: number; future: boolean; today: boolean }[];
@@ -49,7 +49,7 @@ interface WeekData {
   categories: { categoryId: number | null; name: string; colour: string; icon: string | null; fixed: boolean; total: number; count: number; previous: number; change: number }[];
   places: { merchant: string; label: string; total: number; count: number; colour: string; category: string }[];
   biggest: { id: number; date: string; description: string; merchant: string; label: string; category: string; colour: string; amount: number }[];
-  bills: { recurringId: number; name: string; type: string; date: string; amount: number; status: string }[];
+  bills: { recurringId: number; name: string; type: string; date: string; amount: number; expected: number; status: string }[];
   upcoming: { recurringId: number; name: string; type: string; date: string; amount: number; status: string }[];
   budgets: { id: number; name: string; icon: string | null; colour: string; period: string; periodLabel: string; thisWeek: number; spent: number; available: number; remaining: number; status: string }[];
 }
@@ -103,7 +103,10 @@ function WeekTab({ week, onWeek }: { week: string | null; onWeek: (w: string | n
       <div className="stats">
         <Stat label="Spent" value={<Money value={data.spent} />} sub={<>{money(data.last.spent)} {lastLabel}</>} />
         <Stat label="Day-to-day" value={<Money value={data.dayToDay} />} sub={data.typical ? <>Typical week {money(data.typical.dayToDay)}</> : 'Leaves out bills and rent'} />
-        <Stat label="Bills and fixed costs" value={<Money value={data.fixed} />} sub={`${data.bills.filter((b) => b.status === 'paid').length} of ${data.bills.length} due this week paid`} />
+        <Stat label="Bills and fixed costs" value={<Money value={data.fixed} />}
+          sub={data.fixedOther > 0
+            ? <>{data.fixedFromBills > 0 ? <><Money value={data.fixedFromBills} /> from bills · </> : null}<Money value={data.fixedOther} /> other fixed costs</>
+            : `${data.bills.filter((b) => b.status === 'paid').length} of ${data.bills.length} due this week paid`} />
         <Stat label="Money in" value={<Money value={data.income} />} sub={data.saved ? <>Saved and invested {money(data.saved)}</> : 'Nothing moved to savings'} tone={data.income > 0 ? 'good' : undefined} />
       </div>
 
@@ -190,7 +193,7 @@ function WeekTab({ week, onWeek }: { week: string | null; onWeek: (w: string | n
                   <span className="week-date">{weekday(b.date).slice(0, 3)}<b>{Number(b.date.slice(8))}</b></span>
                   <span className="grow">{b.name}</span>
                   <Badge tone={b.status === 'paid' ? 'good' : b.status === 'overdue' ? 'bad' : 'neutral'}>{b.status === 'paid' ? 'Paid' : b.status === 'overdue' ? 'Overdue' : b.status === 'skipped' ? 'Skipped' : 'Due'}</Badge>
-                  <strong className="num">{money(b.amount)}</strong>
+                  <strong className="num">{money(b.amount)}{b.status === 'paid' && b.expected !== b.amount && <span className="muted small" style={{ fontWeight: 500 }}> usually {money(b.expected)}</span>}</strong>
                 </li>
               ))}
               {data.upcoming.length > 0 && <li className="week-sep muted small">Next week</li>}

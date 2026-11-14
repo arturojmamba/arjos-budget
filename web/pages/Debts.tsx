@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, qs } from '../api.ts';
 import { addMonths, money, monthLabel, parseAmount, penceToInput, pct, shortDate } from '../format.ts';
-import { AccountSelect, Badge, Card, Empty, Field, Modal, Money, Progress, Segmented, Stat, useApp, useConfirm, useData } from '../components/ui.tsx';
+import { AccountSelect, Badge, Card, Empty, Field, Modal, Money, Progress, Segmented, Stat, useApp, useConfirm, useData, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 
@@ -44,6 +44,7 @@ const aprText = (bp: number) => `${(bp / 100).toFixed(bp % 100 === 0 ? 0 : 2)}%`
 export function Debts() {
   const { data, error } = useData<DebtList>(() => api.get('/api/debts'), []);
   const [editing, setEditing] = useState<DebtItem | 'new' | 'new-pay3' | null>(null);
+  usePageAdd('Add debt', () => setEditing('new'));
   if (error) return <Empty icon="alert" title="Couldn't load debts">{error}</Empty>;
   if (!data) return <div className="loading" />;
   const { items, totals } = data;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, qs } from '../api.ts';
 import { money, monthLabel, parseAmount, penceToInput, shortDate } from '../format.ts';
-import { AccountSelect, Badge, Bubble, Card, Empty, Field, Modal, Money, Segmented, Stat, useApp, useConfirm, useData } from '../components/ui.tsx';
+import { AccountSelect, Badge, Bubble, Card, Empty, Field, Modal, Money, Segmented, Stat, useApp, useConfirm, useData, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 import { EmojiPicker } from './Categories.tsx';
@@ -33,6 +33,7 @@ export function Goals() {
   const [showArchived, setShowArchived] = useState(false);
   const { data, error } = useData<GoalList>(() => api.get(`/api/goals${qs({ archived: showArchived ? 1 : undefined })}`), [showArchived]);
   const [editing, setEditing] = useState<Goal | { accountId?: number; name?: string; emergency?: boolean } | null>(null);
+  usePageAdd('New goal', () => setEditing({}));
   const [moving, setMoving] = useState<Goal | null>(null);
 
   if (error) return <Empty icon="alert" title="Couldn't load goals">{error}</Empty>;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api, qs, type Occurrence, type Plan, type Recurring, type Suggestion } from '../api.ts';
 import { FREQUENCY_LABELS, privateLabel, addMonths, dayMonth, money, monthLabel, pct, relativeDay, shortDate } from '../format.ts';
-import { Badge, Bubble, Card, Empty, Modal, Money, Stat, useApp, useData, useFitRows, usePaged } from '../components/ui.tsx';
+import { Badge, Bubble, Card, Empty, Modal, Money, Stat, useApp, useData, useFitRows, usePaged, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { RecurringForm, type RecurringDraft } from '../components/RecurringForm.tsx';
 
@@ -16,8 +16,8 @@ export function Bills() {
   const { data: plan } = useData<Plan>(() => api.get(`/api/plan${qs({ month: meta.currentMonth })}`), []);
   const { data: suggestions } = useData<Suggestion[]>(() => api.get('/api/recurring/suggestions'), []);
   const [editing, setEditing] = useState<{ item?: Recurring; draft?: RecurringDraft } | null>(null);
+  usePageAdd('Add bill', () => setEditing({}));
   const [paying, setPaying] = useState<Occurrence | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   if (!items || !monthItems || !plan) return <div className="loading" />;
   // The rest of this month: anything due from today, plus anything still unpaid from earlier.
@@ -48,13 +48,7 @@ export function Bills() {
           <span>{rises.map((r) => `${r.name} went up from ${money(r.lastChange!.from)} to ${money(r.lastChange!.to)}`).join(' · ')}</span>
         </div>
       )}
-      {suggestions && suggestions.length > 0 && (
-        <button className="banner banner-info" onClick={() => setShowSuggestions(true)}>
-          <Icon name="sparkles" size={16} />
-          <span>Found {suggestions.length} regular payment{suggestions.length === 1 ? '' : 's'} in your transactions that aren't tracked yet</span>
-          <Icon name="chevron-right" size={16} />
-        </button>
-      )}
+      {suggestions && suggestions.length > 0 && <Untracked suggestions={suggestions} onEdit={(s) => setEditing({ draft: s })} />}
 
       <div className="grid-main">
         <Card className="fit-row" title={day ? `Due ${shortDate(day)}` : `Rest of ${monthLabel(meta.currentMonth)}`} pad={false}
@@ -151,9 +145,6 @@ export function Bills() {
 
       {editing && <RecurringForm item={editing.item} draft={editing.draft} onClose={() => setEditing(null)} />}
       {paying && <PaymentModal o={paying} onClose={() => setPaying(null)} />}
-      {showSuggestions && suggestions && (
-        <SuggestionsModal suggestions={suggestions} onClose={() => setShowSuggestions(false)} onAdd={(s) => { setShowSuggestions(false); setEditing({ draft: s }); }} />
-      )}
     </div>
   );
 }
@@ -264,21 +255,57 @@ function PaymentModal({ o, onClose }: { o: Occurrence; onClose: () => void }) {
   );
 }
 
-function SuggestionsModal({ suggestions, onClose, onAdd }: { suggestions: Suggestion[]; onClose: () => void; onAdd: (s: Suggestion) => void }) {
-  const { accounts } = useApp();
+/**
+ * Payments in your transactions that look regular but aren't tracked: anything in a Fixed category
+ * (subscriptions, bills, rent) or regular pay like salary, and anything that repeats on a schedule.
+ * Add tracks it in one click, filled in from the transaction; Edit first opens the form; Not regular
+ * hides it for good.
+ */
+function Untracked({ suggestions, onEdit }: { suggestions: Suggestion[]; onEdit: (s: Suggestion) => void }) {
+  const { accounts, refresh, toast } = useApp();
+  const [busy, setBusy] = useState<string | null>(null);
+  const { rows, pager } = usePaged(suggestions, 5, String(suggestions.length));
+  async function add(s: Suggestion) {
+    setBusy(s.key);
+    try {
+      await api.post('/api/recurring', {
+        name: s.name, type: s.type, amount: s.amount, variable: s.variable, frequency: s.frequency, startDate: s.startDate,
+        schedule: s.schedule, accountId: s.accountId, categoryId: s.categoryId, matchPattern: s.matchPattern,
+      });
+      toast(`${s.name} is now tracked in ${s.type === 'income' ? 'Income' : s.type === 'subscription' ? 'Subscriptions' : 'Bills'}`);
+      refresh();
+    } catch (e: any) { toast(e.message, 'error'); } finally { setBusy(null); }
+  }
+  async function dismiss(s: Suggestion) {
+    await api.post('/api/recurring/suggestions/dismiss', { key: s.key });
+    toast(`${s.name} won't be suggested again`);
+    refresh();
+  }
   return (
-    <Modal title="Regular payments found" onClose={onClose} wide>
-      <p className="muted" style={{ marginBottom: 12 }}>These repeat in your transactions. Add the ones you want to track. You can check and edit the details before saving.</p>
-      <ul className="history-list">
-        {suggestions.map((s) => (
-          <li key={`${s.accountId}-${s.matchPattern}`}>
-            <span className="grow"><strong>{s.name}</strong> <span className="muted small">· {FREQUENCY_LABELS[s.frequency].toLowerCase()} · {s.count} payments · {accounts.find((a) => a.id === s.accountId)?.name}{s.categoryName ? ` · ${s.categoryName}` : ''}</span></span>
-            <span className="money">{s.variable ? '~' : ''}{money(s.amount)}</span>
-            <button className="btn btn-sm" onClick={() => onAdd(s)}><Icon name="plus" size={14} /> Add</button>
+    <Card title={`Not tracked yet (${suggestions.length})`} pad={false}
+      action={<span className="muted small">Found in your transactions</span>}>
+      <ul className="untracked">
+        {rows.map((s) => (
+          <li key={s.key}>
+            <Bubble colour={TYPE_COLOUR[s.type]} icon={TYPE_ICON[s.type]} size={32} />
+            <span className="grow">
+              <strong>{s.name}</strong>
+              <span className="muted small">
+                {s.type === 'income' ? 'Income' : s.type === 'subscription' ? 'Subscription' : 'Bill'} · {FREQUENCY_LABELS[s.frequency].toLowerCase()}{s.schedule === 'last_working_day' ? ', last working day' : ''}
+                {' · '}{s.count > 1 ? `${s.count} payments` : `paid ${shortDate(s.lastDate)}`} · {accounts.find((a) => a.id === s.accountId)?.name}{s.categoryName ? ` · ${s.categoryName}` : ''}
+              </span>
+            </span>
+            <span className={`money ${s.type === 'income' ? 'amt-in' : ''}`}>{s.variable ? '~' : ''}{money(s.amount)}</span>
+            <span className="untracked-actions">
+              <button className="btn btn-sm btn-primary" onClick={() => add(s)} disabled={busy === s.key}><Icon name="plus" size={14} /> Add</button>
+              <button className="btn btn-sm" onClick={() => onEdit(s)}>Edit first</button>
+              <button className="link-btn small" onClick={() => dismiss(s)}>Not regular</button>
+            </span>
           </li>
         ))}
       </ul>
-    </Modal>
+      {pager}
+    </Card>
   );
 }
 

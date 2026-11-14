@@ -24,7 +24,7 @@ import { previewImport, commitImport, undoImport, listImports, listSkipped, rest
 import { PRESETS } from './importers/presets.ts';
 import { monthOf, todayIso, addDays, daysInMonth } from './dates.ts';
 import {
-  createRecurring, updateRecurring, deleteRecurring, listRecurring, occurrences, monthPlan, setPayment, suggestRecurring, autoMatch, FREQUENCIES,
+  createRecurring, updateRecurring, deleteRecurring, listRecurring, occurrences, monthPlan, setPayment, suggestRecurring, dismissSuggestion, autoMatch, FREQUENCIES,
 } from './recurring.ts';
 import { listBudgets, createBudget, updateBudget, deleteBudget, reorderBudgets, suggestBudgets, budgetCategoryIds, budgetAccount, budgetGuide, updateGuide } from './budgets.ts';
 import { listDebts, debtPlan, saveDebtPlan, saveDebt, createDebt, deleteDebtDetails, linkCandidates, linkToDebt, reviewRepayments, debtTimeline, archiveDebt, addRepaymentToBills, DEBT_TYPES } from './debts.ts';
@@ -304,6 +304,7 @@ route('DELETE', '/api/recurring/:id', ({ db, params }) => { deleteRecurring(db, 
 route('POST', '/api/recurring/:id/payment', ({ db, params, body }) => { setPayment(db, id(params), body); return { ok: true }; });
 route('PUT', '/api/recurring/:id/shares', ({ db, params, body }) => saveShares(db, id(params), body?.shares ?? [], { applyToPast: body?.applyToPast === true }));
 route('GET', '/api/recurring/suggestions', ({ db }) => suggestRecurring(db));
+route('POST', '/api/recurring/suggestions/dismiss', ({ db, body }) => { dismissSuggestion(db, (body as any)?.key); return { ok: true }; });
 route('GET', '/api/upcoming', ({ db, query }) => {
   const today = todayIso();
   const month = query.get('month');

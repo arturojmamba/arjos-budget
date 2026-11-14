@@ -110,6 +110,7 @@ export interface Plan {
   monthly: { bills: number; subscriptions: number; savings: number; debts: number; income: number };
 }
 export interface Suggestion {
+  key: string; source: 'pattern' | 'category'; schedule: 'fixed' | 'last_working_day';
   name: string; matchPattern: string; type: RecurringType; amount: number; variable: boolean; frequency: Frequency; startDate: string;
   accountId: number; accountIsCard: boolean; categoryId: number | null; categoryName: string | null; count: number; lastDate: string;
 }

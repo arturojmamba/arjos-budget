@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { api, qs } from '../api.ts';
 import { money, monthLabel, parseAmount, penceToInput, pct } from '../format.ts';
-import { AccountSelect, Badge, Bubble, Card, Empty, Field, Modal, Money, Progress, Segmented, useApp, useConfirm, useData } from '../components/ui.tsx';
+import { AccountSelect, Badge, Bubble, Card, Empty, Field, Modal, Money, Progress, Segmented, useApp, useConfirm, useData, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 
@@ -41,6 +41,7 @@ export function Budgets({ month }: { month: string }) {
   const { data, error } = useData<BudgetList>(() => api.get(`/api/budgets${qs({ month })}`), [month]);
   const { data: suggestions } = useData<Suggestion[]>(() => api.get('/api/budgets/suggestions'), []);
   const [editing, setEditing] = useState<BudgetView | 'new' | 'new-goal' | { draft: { categoryId: number; name: string; percent: number | null } } | null>(null);
+  usePageAdd('New budget', () => setEditing('new'));
   const [quickStart, setQuickStart] = useState(false);
 
   if (error) return <Empty icon="alert" title="Couldn't load budgets">{error}</Empty>;
@@ -166,7 +167,7 @@ function BudgetCard({ b, month, isCurrent, onEdit }: { b: BudgetView; month: str
       </div>
       <div className="mini-bars" aria-label="Last 6 periods">
         {b.history.map((h, i) => (
-          <div key={h.key} className="mini-bar" title={`${h.label}: ${money(h.spent)} of ${money(h.limit)}`}>
+          <div key={h.key} className="mini-bar" role="img" aria-label={`${h.label}: ${money(h.spent)} of ${money(h.limit)}, ${h.spent > h.limit ? 'over' : 'within the limit'}`} title={`${h.label}: ${money(h.spent)} of ${money(h.limit)}${h.spent > h.limit ? ', over' : ''}`}>
             <span className="lim" style={{ bottom: `calc(${(h.limit / maxHist) * 30}px + 16px)` }} />
             <span className={`b ${h.spent > h.limit ? 'over' : ''} ${i === b.history.length - 1 ? 'cur' : ''}`} style={{ height: `${(h.spent / maxHist) * 30}px` }} />
             <i>{h.short}</i>

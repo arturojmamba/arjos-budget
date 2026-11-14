@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { testDb } from './fixtures.ts';
 import { createTransaction, simpleToPostings, deleteTransaction } from '../server/ledger.ts';
 import { lastWorkingDay, bankHolidays, isWorkingDay } from '../server/calendar.ts';
-import { createRecurring, dueDates, monthlyEquivalent, listRecurring, monthPlan, setPayment, suggestRecurring, autoMatch, occurrences } from '../server/recurring.ts';
+import { createRecurring, dueDates, monthlyEquivalent, listRecurring, monthPlan, setPayment, suggestRecurring, dismissSuggestion, autoMatch, occurrences } from '../server/recurring.ts';
 import { addDays, todayIso, monthOf } from '../server/dates.ts';
 
 function setup() {
@@ -138,6 +138,29 @@ test('suggests regular payments found in history', () => {
   assert.equal(s[0].type, 'subscription');
   assert.equal(s[0].frequency, 'monthly');
   assert.equal(s[0].startDate, base, 'starts at the first payment so history is matched');
+});
+
+test('anything in a Fixed category, or salary, is suggested after one payment; Not regular hides it', () => {
+  const { db, spend, acc, cat } = setup();
+  const today = todayIso();
+  spend(addDays(today, -5), 'STREAMBOX', 'Crest Card 1', 399, 'Subscriptions');
+  spend(addDays(today, -10), 'NEWTOWN WATER', 'Crest Card 1', 3600, 'Bills & Utilities');
+  spend(addDays(today, -12), 'CORNER CAFE', 'Crest Card 1', 450, 'Eating Out'); // not a fixed category
+  spend(addDays(today, -150), 'OLD GYM', 'Crest Card 1', 3000, 'Subscriptions'); // stopped long ago
+  createTransaction(db, simpleToPostings({ kind: 'income', date: '2026-10-30', description: 'ACME LTD SALARY', accountId: acc('Northbank Current'), categoryId: cat('Salary'), amount: 240000 }));
+  const s = suggestRecurring(db);
+  const names = s.map((x) => x.name).sort();
+  assert.ok(names.includes('Streambox') && names.includes('Newtown Water'), names.join(','));
+  assert.ok(!names.includes('Corner Cafe') && !names.includes('Old Gym'), names.join(','));
+  const sub = s.find((x) => x.name === 'Streambox')!;
+  assert.equal(sub.type, 'subscription');
+  assert.equal(sub.frequency, 'monthly');
+  assert.equal(sub.source, 'category');
+  const pay = s.find((x) => x.type === 'income')!;
+  assert.equal(pay.name, 'Acme Ltd Salary');
+  assert.equal(pay.schedule, 'last_working_day', 'paid at the month end');
+  dismissSuggestion(db, sub.key);
+  assert.ok(!suggestRecurring(db).some((x) => x.name === 'Streambox'), 'Not regular hides it');
 });
 
 test('bonuses: inside the salary payment, paid separately, or expected as a one-off', async () => {

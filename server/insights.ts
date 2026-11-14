@@ -524,8 +524,11 @@ export function weekly(db: DB, week?: string | null, today = todayIso()) {
     .map((r) => ({ id: r.id, date: r.date, description: r.description, merchant: merchantKey(r.merchant), label: placeLabel(merchantKey(r.merchant)), category: r.catName ?? r.topName, colour: r.topColour, amount: r.amount }));
 
   // Bills due this week, and what's coming next week.
-  const bill = (o: ReturnType<typeof occurrences>[number]) => ({ recurringId: o.recurringId, name: o.name, type: o.type, date: o.dueDate, amount: o.paidAmount ?? o.expected, status: o.status });
+  const bill = (o: ReturnType<typeof occurrences>[number]) => ({ recurringId: o.recurringId, name: o.name, type: o.type, date: o.dueDate, amount: o.paidAmount ?? o.expected, expected: o.expected, status: o.status });
   const bills = occurrences(db, from, to).filter((o) => o.type !== 'income').map(bill);
+  // What the fixed-costs total is made of: tracked bills paid this week, and the rest of the spending
+  // in Fixed categories (a charge that isn't set up as a bill, a fee).
+  const fixedFromBills = sum(bills.filter((b) => b.status === 'paid' && (b.type === 'bill' || b.type === 'subscription')).map((b) => b.amount));
   const nextWeek = current ? occurrences(db, addDays(to, 1), addDays(to, 7)).filter((o) => o.type !== 'income').map(bill) : [];
 
   // Budgets: what went on each this week, and where it stands for its period.
@@ -543,6 +546,7 @@ export function weekly(db: DB, week?: string | null, today = todayIso()) {
     from, to, upTo, current, elapsed, isLastWeek: from === addDays(thisWeek, -7), isFirstWeek: !!firstTx && to < firstTx,
     previousWeek: prevFrom, nextWeek: current ? null : addDays(from, 7),
     spent: spent(rows), dayToDay: dayToDay(rows), fixed: spent(rows) - dayToDay(rows),
+    fixedFromBills: Math.min(fixedFromBills, spent(rows) - dayToDay(rows)), fixedOther: Math.max(0, spent(rows) - dayToDay(rows) - fixedFromBills),
     income: t.income, saved: t.saved, count: rows.length,
     last: { spent: spent(current ? prevSame : prevAll), dayToDay: dayToDay(current ? prevSame : prevAll), sameDays: current, fullWeek: spent(prevAll) },
     typical,

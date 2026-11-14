@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api, qs, type Account, type IsaAllowance, type ValuationPoint } from '../api.ts';
 import { ACCOUNT_TYPE_LABELS, money, parseAmount, penceToInput, shortDate, timeAgo, pct } from '../format.ts';
-import { Card, Field, Modal, Money, useApp, useConfirm, Stat, Badge, Progress, useData } from '../components/ui.tsx';
+import { Card, Field, Modal, Money, useApp, useConfirm, Stat, Badge, Progress, useData, usePageAdd } from '../components/ui.tsx';
 import { ValueLine } from '../components/charts.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
@@ -12,6 +12,7 @@ const COLOURS = ['#006a4d', '#11b67a', '#2e77bb', '#5a9bd5', '#117aca', '#7433ff
 export function Accounts() {
   const { accounts } = useApp();
   const [editing, setEditing] = useState<Account | 'new' | null>(null);
+  usePageAdd('Add account', () => setEditing('new'));
   const [investing, setInvesting] = useState<Account | null>(null);
   const top = accounts.filter((a) => a.parentId === null);
   const children = (id: number) => accounts.filter((a) => a.parentId === id);
