@@ -70,7 +70,7 @@ export function Overview({ month }: { month: string }) {
         ) : (
           <Stat label={privateLabel(left >= 0, 'Left over', 'Overspent', 'Income minus spending')} value={<Money value={Math.abs(left)} />} tone={left >= 0 ? 'good' : 'bad'} sub={`Savings rate ${pct(s.savingsRate)}`} />
         )}
-        <Stat label="Net worth" value={<Money value={s.netWorth} />} sub={<span className={s.netWorthChange >= 0 ? 'tone-good' : 'tone-bad'}>{money(s.netWorthChange, { sign: true })} vs last month</span>} />
+        <Stat label="Net worth" value={<Money value={s.netWorth} />} sub={<span>{s.netWorthChange >= 0 ? 'Up' : 'Down'} {money(Math.abs(s.netWorthChange))} on last month</span>} />
       </div>
 
       {/* Row 1: where the money went | this month's plan */}
@@ -257,7 +257,7 @@ function SpendingByCategory({ s, month }: { s: Summary; month: string }) {
                     <Bubble colour={c.colour} icon={catIcon(c.categoryId)} size={30} />
                     <span className="cat-name">{c.name}{c.isFixed && <span className="tag">Fixed</span>}</span>
                     <span className="cat-amt"><Money value={c.amount} /><span className="muted small">{view.spending ? Math.round((c.amount / view.spending) * 100) : 0}%</span></span>
-                    <span className="cat-bar"><Progress value={c.amount} max={cats[0].amount} tone="good" /></span>
+                    <span className="cat-bar"><Progress value={c.amount} max={cats[0].amount} colour={c.colour} /></span>
                   </button>
                 </li>
               ))}

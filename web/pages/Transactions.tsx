@@ -232,7 +232,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
           <div className="side-totals">
             <div><span className="muted small">In</span><Money value={totals.in} className="amt-in" /></div>
             <div><span className="muted small">Out</span><Money value={totals.out} /></div>
-            <div><span className="muted small">Net</span><Money value={totals.in - totals.out} className={totals.in - totals.out >= 0 ? 'amt-in' : 'tone-bad'} /></div>
+            <div><span className="muted small">Net</span><Money value={totals.in - totals.out} /></div>
             {byMonth.some((m) => m.saved !== 0) && <div><span className="muted small">Saved</span><Money value={byMonth.reduce((t, m) => t + m.saved, 0)} className="amt-saved" /></div>}
           </div>
           {byCat.length === 0 ? <p className="muted small">No spending in this view.</p> : (
@@ -244,7 +244,7 @@ export function Transactions({ params }: { params: URLSearchParams }) {
                     <span className="grow">{c.name}</span>
                     <Money value={c.amount} />
                   </button>
-                  <Progress value={c.amount} max={byCat[0].amount} tone="good" />
+                  <Progress value={c.amount} max={byCat[0].amount} colour={c.colour} />
                 </li>
               ))}
             </ul>

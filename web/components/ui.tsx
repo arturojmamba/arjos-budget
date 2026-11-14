@@ -60,12 +60,17 @@ export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'good
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
-export function Progress({ value, max, tone }: { value: number; max: number; tone?: 'good' | 'warn' | 'bad' }) {
+/**
+ * A bar. Against a limit (no tone or colour), it says how it's going: green, amber from 85%, red when
+ * over. `colour` is for a share of something (a category's part of the spending), which is neither
+ * good nor bad. `info` is for money being saved or moved.
+ */
+export function Progress({ value, max, tone, colour }: { value: number; max: number; tone?: 'good' | 'warn' | 'bad' | 'info'; colour?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const t = tone ?? (pct >= 100 ? 'bad' : pct >= 85 ? 'warn' : 'good');
   return (
     <div className="progress" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-      <span className={`progress-${t}`} style={{ width: `${pct}%` }} />
+      {colour ? <span className="progress-cat" style={{ width: `${pct}%`, background: colour }} /> : <span className={`progress-${t}`} style={{ width: `${pct}%` }} />}
     </div>
   );
 }

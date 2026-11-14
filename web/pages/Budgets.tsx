@@ -445,9 +445,9 @@ function PayGuide({ month, onCreate, startOpen = false }: { month: string; onCre
 
   const sourceText = g.takeHome.source === 'manual' ? 'set by you' : g.takeHome.source === 'salary' ? 'from your salary in Bills and income' : g.takeHome.source === 'average' ? 'average income, last 3 months' : 'not set';
   const parts: { key: 'needs' | 'wants' | 'savings'; label: string; colour: string; note: string }[] = [
-    { key: 'needs', label: 'Needs', colour: '#0ea5e9', note: 'Rent, bills, groceries, transport' },
+    { key: 'needs', label: 'Needs', colour: 'var(--spend)', note: 'Rent, bills, groceries, transport' },
     { key: 'wants', label: 'Wants', colour: '#8b5cf6', note: 'Eating out, shopping, fun' },
-    { key: 'savings', label: 'Savings', colour: '#10b981', note: 'Money moved to savings and investments' },
+    { key: 'savings', label: 'Savings', colour: 'var(--saved)', note: 'Money moved to savings and investments' },
   ];
 
   return (
@@ -487,13 +487,15 @@ function PayGuide({ month, onCreate, startOpen = false }: { month: string; onCre
               {parts.map((p) => {
                 const target = take ? Math.round((take * g.split[p.key]) / 10000) : null;
                 const actual = g.actual[p.key];
-                const over = target != null && (p.key === 'savings' ? actual < target : actual > target);
+                const saving = p.key === 'savings';
+                const over = target != null && !saving && actual > target;
+                const reached = target != null && saving && actual >= target;
                 return (
                   <div key={p.key} className="split-row">
                     <span className="dot" style={{ background: p.colour }} />
                     <span className="grow"><strong>{p.label}</strong> <span className="muted small">{pctText(g.split[p.key])} · {p.note}</span></span>
-                    <span className={`small ${over ? (p.key === 'savings' ? 'tone-warn' : 'tone-bad') : 'muted'}`}>{money(actual)}{target != null && <> of {money(target)}</>}</span>
-                    {target != null && <span className="rule-bar"><Progress value={actual} max={target} tone={over ? (p.key === 'savings' ? 'warn' : 'bad') : 'good'} /></span>}
+                    <span className={`small ${over ? 'tone-bad' : reached ? 'tone-good' : 'muted'}`}>{money(actual)}{target != null && <> of {money(target)}</>}</span>
+                    {target != null && <span className="rule-bar"><Progress value={actual} max={target} tone={saving ? (reached ? 'good' : 'info') : undefined} /></span>}
                   </div>
                 );
               })}
