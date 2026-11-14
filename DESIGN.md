@@ -129,3 +129,10 @@ Cards 16px radius; inputs and insets 10px; buttons, badges and segmented control
 - Do use the -text colour for any coloured text.
 - Don't use green for "big" or red for "small": colour is a verdict, not a size.
 - Don't introduce a new hex in a component; add a token here and in `styles.css`.
+
+## Brand surfaces (1.8)
+
+- **Navy sidebar** in both themes (`#0f1a2e` light, `#08101d` dark). It carries the `.on-navy` class, which borrows the dark-mode tokens so anything inside reads correctly. The brand mark stays on its gold tile there.
+- **Navy band on Overview**: behind the greeting and the headline tiles, sized by `useNavyBand` to end 26px below them. Tiles inside use `#17243d`.
+- **Category icons** are line icons. Stored emoji map to icons through `iconFor` (Icon.tsx); unmapped emoji still show as emoji. Use `CatGlyph` for inline icons, `Bubble` for tinted circles.
+- **Pace rings** are Coil's signature: outer gold ring = time through the pay cycle, inner ring = share of spending money used, with the snake's head at its tip. Inner is green while behind time, amber when 10+ points ahead, red when over. Shown in the Overview hero tile and at the top of Payday. Don't use them for anything else.

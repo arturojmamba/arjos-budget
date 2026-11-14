@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { PaceRings, PaceKey, paceTone, cycleProgress, lastPayday } from '../components/PaceRings.tsx';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, qs, type Summary, type Plan, type Occurrence, type MonthSpending } from '../api.ts';
 import { money, monthLabel, pct, dayMonth, relativeDay, addMonths, shortDate, privateLabel, niceName } from '../format.ts';
 import { Badge, Card, Empty, Money, Stat, useApp, useData, Bubble, Progress } from '../components/ui.tsx';
@@ -19,6 +20,7 @@ export function Overview({ month }: { month: string }) {
   const { data: plan } = useData<Plan>(() => api.get(`/api/plan${qs({ month })}`), [month]);
   const { data: upcoming } = useData<Occurrence[]>(() => api.get('/api/upcoming?days=35'), []);
   const { data: budgets } = useData<BudgetList>(() => api.get(`/api/budgets${qs({ month })}`), [month]);
+  const statsRef = useNavyBand();
   if (error) return <Empty icon="alert" title="Couldn't load your summary">{error}</Empty>;
   if (!s || !plan) return <div className="loading" />;
   const isCurrent = month === meta.currentMonth;
@@ -60,7 +62,7 @@ export function Overview({ month }: { month: string }) {
       <PaydayCard />
       <HealthBanner />
 
-      <div className={`stats ${heroOn ? 'stats-hero' : ''}`}>
+      <div ref={statsRef} className={`stats ${heroOn ? 'stats-hero' : ''} on-navy band-stats`}>
         {heroOn && <FreeHero s={s} plan={plan} payday={payday} today={meta.today} />}
         <Stat label="Income" value={<Money value={s.income} />}
           sub={plan.incomeExpected > s.income ? `${money(plan.incomeExpected - s.income, { compact: true })} still expected`
@@ -294,21 +296,34 @@ function FreeHero({ s, plan, payday, today }: { s: Summary; plan: Plan; payday: 
   const daysLeft = payday ? Math.max(1, daysBetween(today, payday)) : Math.max(1, p.daysInMonth - p.day + 1);
   const perDay = free > 0 ? Math.floor(free / daysLeft) : 0;
   const ahead = p.isCurrent && p.lastMonthToDate > 0 ? p.spentToDate - p.lastMonthToDate : 0;
-  const fast = ahead > Math.max(2500, p.lastMonthToDate * 0.1);
-  const verdict = free < 0 ? { tone: 'bad' as const, label: 'Over' } : fast ? { tone: 'warn' as const, label: 'Spending faster than last month' } : { tone: 'good' as const, label: 'On track' };
+  // The rings: time through the pay cycle against the share of spending money used.
+  const month = plan.month;
+  const start = payday ? lastPayday(month) : `${month}-01`;
+  const end = payday ?? `${month}-${String(p.daysInMonth).padStart(2, '0')}`;
+  const time = cycleProgress(today, start, end);
+  const pot = plan.otherSpending + Math.max(0, free);
+  const used = free < 0 ? 1 : pot > 0 ? plan.otherSpending / pot : 0;
+  const tone = paceTone(time, used, free < 0);
+  const verdict = tone === 'bad' ? 'Over' : tone === 'warn' ? 'Spending ahead of time' : 'On track';
   const until = payday ? `until payday` : `left this month`;
   return (
     <div className="stat stat-hero">
-      <div className="stat-hero-top">
-        <p className="stat-label">{free >= 0 ? 'Free to spend' : 'Over this month'}</p>
-        <Badge tone={verdict.tone}>{verdict.label}</Badge>
+      <div className="stat-hero-body">
+        <div className="stat-hero-top">
+          <p className="stat-label">{free >= 0 ? 'Free to spend' : 'Over this month'}</p>
+          <Badge tone={tone}>{verdict}</Badge>
+        </div>
+        <p className={`stat-value ${free < 0 ? 'tone-bad' : ''}`}><Money value={Math.abs(free)} /></p>
+        <p className="stat-sub">
+          {free < 0
+            ? <>Bills, savings and spending come to more than this month's pay. Spend less or move a saving.</>
+            : <><Money value={perDay} /> a day for {daysLeft} day{daysLeft === 1 ? '' : 's'} {until}{ahead !== 0 && Math.abs(ahead) >= 100 ? <>, <Money value={Math.abs(ahead)} /> {ahead > 0 ? 'more' : 'less'} spent than by this point last month</> : null}.</>}
+        </p>
       </div>
-      <p className={`stat-value ${free < 0 ? 'tone-bad' : ''}`}><Money value={Math.abs(free)} /></p>
-      <p className="stat-sub">
-        {free < 0
-          ? <>Bills, savings and spending come to more than this month's pay. Spend less or move a saving.</>
-          : <><Money value={perDay} /> a day for {daysLeft} day{daysLeft === 1 ? '' : 's'} {until}{ahead !== 0 && Math.abs(ahead) >= 100 ? <>, <Money value={Math.abs(ahead)} /> {ahead > 0 ? 'more' : 'less'} spent than by this point last month</> : null}.</>}
-      </p>
+      <div className="stat-hero-rings">
+        <PaceRings time={time} money={used} tone={tone} />
+        <PaceKey time={time} money={used} />
+      </div>
     </div>
   );
 }
@@ -398,4 +413,26 @@ function HealthBanner() {
       <Icon name="chevron-right" size={16} />
     </button>
   );
+}
+
+/** Paints the navy band on the page behind the greeting and the headline tiles, sized to end just below them. */
+function useNavyBand() {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const main = document.querySelector<HTMLElement>('.main');
+    if (!main) return;
+    const fit = () => {
+      const el = ref.current;
+      if (!el) return;
+      const h = el.getBoundingClientRect().bottom - main.getBoundingClientRect().top + 26;
+      main.style.setProperty('--band-h', `${Math.round(h)}px`);
+      main.classList.add('has-band');
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(main);
+    if (ref.current) ro.observe(ref.current);
+    return () => { ro.disconnect(); main.classList.remove('has-band'); main.style.removeProperty('--band-h'); };
+  });
+  return ref;
 }

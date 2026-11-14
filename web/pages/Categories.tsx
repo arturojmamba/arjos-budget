@@ -3,7 +3,7 @@ import { api, type Category, type Rule } from '../api.ts';
 import { Bubble, Card, CategorySelect, AccountSelect, Field, Modal, Segmented, useApp, useConfirm, useData, Empty, Badge } from '../components/ui.tsx';
 import { SuggestedRules, type RuleSuggestion } from '../components/RuleSuggestions.tsx';
 import { setParams, useRoute } from '../router.ts';
-import { Icon } from '../components/Icon.tsx';
+import { Icon, CatGlyph } from '../components/Icon.tsx';
 import { looksLikeTransfer, shortDate } from '../format.ts';
 
 const COLOURS = ['#16a34a', '#f97316', '#0ea5e9', '#ec4899', '#8b5cf6', '#6366f1', '#eab308', '#b45309', '#14b8a6', '#06b6d4', '#f43f5e', '#3b82f6', '#dc2626', '#059669', '#d946ef', '#64748b'];
@@ -84,7 +84,7 @@ export function Categories() {
               {subs.map((c) => (
                 <li key={c.id} className={`sub ${c.archived ? 'is-archived' : ''} ${drag?.id === c.id ? 'dragging' : ''} ${over === c.id && drag?.id !== c.id ? 'drop-target' : ''}`} {...dragProps(c, subs)}>
                   <span className="drag-handle" aria-hidden="true"><Icon name="grip" size={14} strokeWidth={3} /></span>
-                  {c.icon ? <span className="sub-emoji">{c.icon}</span> : <span className="dot" style={{ background: c.colour }} />}
+                  {c.icon ? <CatGlyph icon={c.icon} className="sub-emoji" /> : <span className="dot" style={{ background: c.colour }} />}
                   <span className="grow">{c.name}{c.archived && <Badge>Archived</Badge>}</span>
                   <span className="muted small">{c.transactionCount}</span>
                   {subs.length > 1 && arrows(c, subs)}

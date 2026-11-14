@@ -140,7 +140,7 @@ export function App() {
   return (
     <AppContext.Provider value={ctx}>
       <div className="shell">
-        <aside className="sidebar">
+        <aside className="sidebar on-navy">
           <div className="brand"><BrandMark /><span>{APP_NAME}</span></div>
           <nav>
             {NAV_GROUPS.map((g, gi) => (
@@ -166,7 +166,7 @@ export function App() {
 
         <main className="main">
           <UpdateBanner />
-          <header className="topbar">
+          <header className={`topbar ${page.path === '/' ? 'on-navy band-top' : ''}`}>
             <h1>{page.path === '/' && meta.profile.name ? greeting(meta.profile.name) : page.label}</h1>
             {showMonth && (
               <div className="month-nav">

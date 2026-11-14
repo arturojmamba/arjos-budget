@@ -4,7 +4,7 @@ import { money, monthLabel, pct, shortDate, amountsHidden, niceName } from '../f
 import { Badge, Bubble, Card, Empty, Field, Money, Segmented, Stat, useApp, useData, useFitRows, usePaged } from '../components/ui.tsx';
 import { IncomeSpendBars } from '../components/charts.tsx';
 import { LineChart, Spark, StackedBars, Waterfall, useHidden } from '../components/viz.tsx';
-import { Icon } from '../components/Icon.tsx';
+import { Icon, CatGlyph } from '../components/Icon.tsx';
 import { navigate, setParams } from '../router.ts';
 
 type Tab = 'week' | 'spending' | 'cashflow' | 'compare' | 'networth' | 'year';
@@ -146,7 +146,7 @@ function WeekTab({ week, onWeek }: { week: string | null; onWeek: (w: string | n
               <ul className="week-list">
                 {data.budgets.map((b) => (
                   <li key={b.id}>
-                    <span className="week-icon">{b.icon ?? '•'}</span>
+                    <span className="week-icon">{b.icon ? <CatGlyph icon={b.icon} /> : '•'}</span>
                     <span className="grow"><strong>{b.name}</strong><div className="muted small">{money(b.thisWeek)} this week · {b.remaining >= 0 ? `${money(b.remaining)} left` : `${money(-b.remaining)} over`} for {b.periodLabel}</div>
                       <span className="week-bar"><span style={{ width: `${Math.min(100, (b.spent / Math.max(1, b.available)) * 100)}%`, background: b.status === 'over' ? 'var(--bad)' : b.status === 'warn' ? 'var(--warn)' : b.colour }} /></span>
                     </span>
@@ -590,7 +590,7 @@ function BudgetRecord() {
         {data.map((b) => {
           const h = b.history;
           return (
-            <Card key={b.id} title={<span className="row gap">{b.icon && <span>{b.icon}</span>}{b.name}</span>} action={<Badge tone={VERDICT[b.verdict].tone}>{VERDICT[b.verdict].text}</Badge>}>
+            <Card key={b.id} title={<span className="row gap"><CatGlyph icon={b.icon} />{b.name}</span>} action={<Badge tone={VERDICT[b.verdict].tone}>{VERDICT[b.verdict].text}</Badge>}>
               <StackedBars labels={h.map((x) => x.short)} titles={h.map((x) => `${x.label}${x.before ? ' (before you set this budget)' : ''}${x.current ? ' (so far)' : ''} · limit ${money(x.limit)}`)} legend={false} height={150}
                 series={[
                   { key: 'in', label: 'Within limit', colour: b.colour, values: h.map((x) => Math.min(x.spent, x.limit || x.spent)) },
@@ -1036,7 +1036,7 @@ function BreakdownTable({ data, hidden, drill }: { data: any; hidden: Set<string
       <tbody>
         {rows.map((s) => (
           <tr data-fit-row key={s.key} className={`${s.drill ? 'clickable' : ''} ${hidden.has(s.key) ? 'off' : ''}`} onClick={() => drill(s.drill)} tabIndex={s.drill ? 0 : -1} onKeyDown={(e) => { if (e.key === 'Enter') drill(s.drill); }}>
-            <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} />{s.icon && <span>{s.icon}</span>}<span className="ellipsis">{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
+            <td><span className="row gap nowrap"><i className="key-box" style={{ background: s.colour }} /><CatGlyph icon={s.icon} /><span className="ellipsis">{s.label}</span>{s.drill && <Icon name="chevron-right" size={14} />}</span></td>
             <td className="num strong"><Money value={s.total} /></td>
             <td className="hide-sm"><span className="share-bar"><span style={{ width: `${Math.round(s.share * 100)}%`, background: s.colour }} /></span><span className="muted small">{pct(s.share)}</span></td>
             <td className="num hide-sm"><Money value={Math.round(s.total / data.months.length)} /></td>

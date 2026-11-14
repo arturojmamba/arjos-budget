@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, qs } from '../api.ts';
 import { money, monthLabel, parseAmount, penceToInput, shortDate } from '../format.ts';
 import { AccountSelect, Badge, Bubble, Card, Empty, Field, Modal, Money, Segmented, Stat, useApp, useConfirm, useData, usePageAdd } from '../components/ui.tsx';
-import { Icon } from '../components/Icon.tsx';
+import { Icon, CatGlyph } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 import { EmojiPicker } from './Categories.tsx';
 
@@ -146,7 +146,7 @@ function GoalCard({ g, essentials, onEdit, onMove }: { g: Goal; essentials: numb
   return (
     <div className={`card card-pad goal-card ${g.status === 'done' ? 'goal-done' : ''} ${g.archived ? 'is-archived' : ''}`}>
       <div className="goal-top">
-        <Ring value={g.progress ?? (g.saved > 0 ? 1 : 0)} colour={g.colour}><span className="goal-emoji">{g.icon ?? '🎯'}</span></Ring>
+        <Ring value={g.progress ?? (g.saved > 0 ? 1 : 0)} colour={g.colour}><span className="goal-emoji"><CatGlyph icon={g.icon ?? '🎯'} size={22} /></span></Ring>
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="budget-name">{g.name}
             {g.status === 'done' && <Badge tone="good">Done</Badge>}
@@ -415,7 +415,7 @@ export function GoalStrip() {
       <div className="goal-strip">
         {goals.map((g) => (
           <button key={g.id} className="goal-tile" onClick={() => navigate('/goals')}>
-            <Ring value={g.progress ?? (g.saved > 0 ? 1 : 0)} colour={g.colour} size={52}><span className="goal-emoji sm">{g.icon ?? '🎯'}</span></Ring>
+            <Ring value={g.progress ?? (g.saved > 0 ? 1 : 0)} colour={g.colour} size={52}><span className="goal-emoji sm"><CatGlyph icon={g.icon ?? '🎯'} size={18} /></span></Ring>
             <span className="goal-tile-text">
               <span className="strong ellipsis">{g.name}</span>
               <span className="small"><Money value={g.saved} />{g.target ? <span className="muted"> of {money(g.target, { compact: true })}</span> : null}</span>

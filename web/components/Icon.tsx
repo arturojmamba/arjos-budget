@@ -65,12 +65,43 @@ const PATHS: Record<string, string> = {
   baby: 'M9 12h.01M15 12h.01M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 3c1.7 0 3 1 3 2.5',
   phone: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM12 18h.01',
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  package: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5M8 5.3l8 4.5',
+  target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
+  dumbbell: 'M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12',
+  pill: 'M10.5 20.5a5 5 0 0 1-7-7l6-6a5 5 0 0 1 7 7l-6 6zM7.5 10.5l6 6',
+  game: 'M6 9h12a4 4 0 0 1 0 8c-1.5 0-2.3-.8-3-2h-6c-.7 1.2-1.5 2-3 2a4 4 0 0 1 0-8zM8 11v3M6.5 12.5h3M16 12h.01M17.5 14h.01',
+  music: 'M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
 };
+
+/** The emoji categories were set up with, drawn as line icons instead. Anything not listed keeps its emoji. */
+const EMOJI_ICONS: Record<string, string> = {
+  '🛒': 'shopping-cart', '🥦': 'shopping-cart', '🍽': 'tools-kitchen-2', '🍔': 'tools-kitchen-2', '🍕': 'tools-kitchen-2', '🍜': 'tools-kitchen-2',
+  '☕': 'coffee', '🚌': 'bus', '🚆': 'bus', '🚇': 'bus', '🚗': 'car', '⛽': 'car', '🛍': 'shopping-bag', '👕': 'shopping-bag',
+  '📺': 'device-tv', '🎬': 'device-tv', '🔁': 'repeat', '🔄': 'repeat', '⚡': 'bolt', '💡': 'bolt', '🏠': 'home', '🏡': 'home',
+  '💪': 'dumbbell', '🏋': 'dumbbell', '💊': 'pill', '🩺': 'heartbeat', '❤': 'heart', '✈': 'plane', '🧳': 'plane', '💅': 'sparkles',
+  '✨': 'sparkles', '🎓': 'school', '📚': 'book', '📖': 'book', '💸': 'percentage', '🏦': 'percentage', '📦': 'package', '💼': 'briefcase',
+  '💻': 'code', '🎁': 'gift', '💝': 'heart', '📈': 'trending-up', '💵': 'cash', '💰': 'cash', '💷': 'cash', '🐷': 'piggy-bank',
+  '📱': 'phone', '🛡': 'shield', '🐾': 'paw', '🐶': 'paw', '🐱': 'paw', '👶': 'baby', '🎯': 'target', '🎮': 'game', '🎵': 'music', '🎧': 'music',
+};
+
+/** The line icon to draw for a stored category or goal icon: its own name, a mapped emoji, or null to show the emoji. */
+export function iconFor(icon: string | null | undefined): string | null {
+  if (!icon) return null;
+  if (/^[a-z0-9-]+$/.test(icon)) return icon;
+  return EMOJI_ICONS[icon.replace(/[\uFE0F\u200D]/g, '')] ?? null;
+}
+
+/** A category's icon at text size: the line icon when there is one, otherwise the emoji. */
+export function CatGlyph({ icon, size = 15, className = 'cat-glyph' }: { icon: string | null | undefined; size?: number; className?: string }) {
+  if (!icon) return null;
+  const name = iconFor(icon);
+  return name ? <Icon name={name} size={size} className={className} /> : <span className={className}>{icon}</span>;
+}
 
 export const CATEGORY_ICONS = [
   'shopping-cart', 'tools-kitchen-2', 'coffee', 'bus', 'car', 'shopping-bag', 'device-tv', 'repeat', 'bolt', 'home', 'heartbeat',
   'plane', 'sparkles', 'school', 'book', 'percentage', 'briefcase', 'code', 'gift', 'heart', 'trending-up', 'cash', 'piggy-bank',
-  'phone', 'shield', 'paw', 'baby', 'dots',
+  'phone', 'shield', 'paw', 'baby', 'package', 'target', 'dumbbell', 'pill', 'game', 'music', 'dots',
 ];
 
 export function Icon({ name, size = 18, className, strokeWidth = 1.8 }: { name: string; size?: number; className?: string; strokeWidth?: number }) {

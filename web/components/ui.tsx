@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Icon } from './Icon.tsx';
+import { Icon, iconFor } from './Icon.tsx';
 import { money, initials } from '../format.ts';
 import type { Account, Category, Meta } from '../api.ts';
 
@@ -48,8 +48,8 @@ export const isIconName = (s: string) => /^[a-z0-9-]+$/.test(s);
 
 export function Bubble({ colour, icon, label, size = 36 }: { colour: string; icon?: string | null; label?: string; size?: number }) {
   return (
-    <span className="bubble" style={{ width: size, height: size, background: `${colour}1f`, color: colour }}>
-      {icon && isIconName(icon) ? <Icon name={icon} size={Math.round(size * 0.5)} />
+    <span className="bubble" style={{ width: size, height: size, background: `${colour}1f`, color: `color-mix(in srgb, ${colour} 80%, var(--text))` }}>
+      {iconFor(icon) ? <Icon name={iconFor(icon)!} size={Math.round(size * 0.5)} />
         : icon ? <span className="bubble-emoji" style={{ fontSize: Math.round(size * 0.52) }}>{icon}</span>
         : <span style={{ fontSize: size * 0.36 }}>{initials(label ?? '?')}</span>}
     </span>

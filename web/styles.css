@@ -43,7 +43,7 @@
   --brand-font: ui-serif, 'New York', 'Iowan Old Style', Georgia, serif;
   color-scheme: light;
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"], .on-navy {
     --bg: #0b1322;
     --surface: #111c30;
     --surface-2: #16233b;
@@ -113,7 +113,7 @@
 }
 /* Accent tint follows whatever accent and theme you pick. */
 :root { --accent-soft: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
-:root[data-theme="dark"] { --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+:root[data-theme="dark"], .on-navy { --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--surface)); } }
 
 /* ---------- Base ---------- */
@@ -1549,3 +1549,56 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Phase 4: brand surfaces ---------- */
+/* .on-navy borrows the dark-mode tokens, so anything inside a navy surface reads correctly in either theme. */
+.on-navy { color: var(--text); }
+.sidebar {
+  background: #0f1a2e; border-right-color: transparent;
+  --brand-tile: #d9c08e; --brand-snake: #0f1a2e; --brand-pound: #0f1a2e; --brand-edge: transparent;
+}
+:root[data-theme="dark"] .sidebar { background: #08101d; border-right-color: #1a2740; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sidebar { background: #08101d; border-right-color: #1a2740; } }
+.sidebar .brand span { color: #f1e5c6; }
+.sidebar nav a.active { background: rgba(217, 192, 142, 0.13); color: #e6cf9c; box-shadow: inset 2px 0 0 #d9c08e; }
+
+/* Overview: a navy band runs behind the greeting and the headline tiles, out to the window edges. */
+.band-stats {
+  --surface: #17243d; --surface-2: #1c2b47; --border: #273855; --track: #24344f; --text-3: #8b95a8;
+  margin-bottom: 26px;
+}
+.main.has-band { background: linear-gradient(#0f1a2e, #0f1a2e) top / 100% var(--band-h, 0px) no-repeat; }
+:root[data-theme="dark"] .main.has-band { background-image: linear-gradient(#0e1829, #0e1829); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .main.has-band { background-image: linear-gradient(#0e1829, #0e1829); } }
+.band-stats .stat { border-color: var(--border); box-shadow: none; }
+.band-top .month-nav, .band-top .privacy-btn { color: var(--text-2); }
+
+/* Pace rings. */
+.stat-hero { flex-direction: row; align-items: center; gap: 18px; }
+.stat-hero-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stat-hero-rings { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.pace-rings .pr-track { stroke: var(--track); }
+.pace-rings .pr-time { stroke: var(--accent-line); transition: stroke-dashoffset 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+.pace-rings .pr-money { stroke: var(--good); transition: stroke-dashoffset 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+.pace-rings.tone-warn .pr-money, .pace-rings.tone-warn .pr-head circle:first-child { stroke: var(--warn); fill: var(--warn); }
+.pace-rings.tone-bad .pr-money, .pace-rings.tone-bad .pr-head circle:first-child { stroke: var(--bad); fill: var(--bad); }
+.pace-rings .pr-head circle:first-child { fill: var(--good); }
+.pace-rings .pr-head .pr-eye { fill: var(--surface); }
+.pace-key { display: flex; gap: 10px; font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+.pace-key span { display: inline-flex; align-items: center; gap: 4px; }
+.pace-key strong { color: var(--text-2); font-weight: 650; }
+.pace-key i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.pk-time { background: var(--accent-line); }
+.payday-head-side { display: flex; align-items: center; gap: 20px; }
+.pk-money { background: var(--good); }
+.tone-warn ~ .pace-key .pk-money { background: var(--warn); }
+.tone-bad ~ .pace-key .pk-money { background: var(--bad); }
+.payday-rings { display: flex; align-items: center; gap: 14px; }
+.payday-rings .pace-key { flex-direction: column; gap: 4px; }
+
+/* Category line icons. */
+.cat-glyph { flex-shrink: 0; vertical-align: -2px; }
+.cat-label { display: inline-flex; align-items: center; gap: 6px; }
+.sub-emoji svg { display: block; margin: 0 auto; }
+.goal-emoji svg, .week-icon svg { display: block; }
+.payday-rings .pace-rings .pr-track { stroke: var(--border); }

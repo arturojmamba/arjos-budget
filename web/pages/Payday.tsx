@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { api, qs } from '../api.ts';
+import { api, qs, type Plan } from '../api.ts';
+import { PaceRings, PaceKey, paceTone, cycleProgress } from '../components/PaceRings.tsx';
 import { money, monthLabel, parseAmount, pct, penceToInput, shortDate, niceName } from '../format.ts';
 import { Badge, Card, Money, Progress, useApp, useConfirm, useData } from '../components/ui.tsx';
-import { Icon } from '../components/Icon.tsx';
+import { Icon, CatGlyph } from '../components/Icon.tsx';
 import { navigate, setParams } from '../router.ts';
 
 interface Move { key: string; kind: 'goal' | 'saving' | 'debt' | 'card'; title: string; to: string; amount: number; due: string | null; status: 'done' | 'partial' | 'waiting' | 'skipped'; moved: number; movedOn: string | null; note: string | null }
@@ -37,6 +38,8 @@ export function Payday({ params }: { params: URLSearchParams }) {
   const cycleParam = params.get('cycle');
   const { data, reload, loading } = useData<PaydayData>(() => api.get(`/api/payday${qs({ cycle: cycleParam ?? undefined })}`), [cycleParam]);
   const { data: logs, reload: reloadLogs } = useData<Log[]>(() => api.get('/api/payday/logs'), []);
+  const period = data?.period;
+  const { data: monthPlan } = useData<Plan | null>(() => (period ? api.get(`/api/plan${qs({ month: period })}`) : Promise.resolve(null)), [period]);
   const [open, setOpen] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
 
@@ -83,10 +86,19 @@ export function Payday({ params }: { params: URLSearchParams }) {
           <h2>{shortDate(data.cycle)}</h2>
           <span className="muted">{upcoming ? 'Planning ahead' : isCurrent ? 'This payday' : 'Past payday'} · pays for {monthLabel(data.period)} · next payday {shortDate(data.next)}{data.daysToNext > 0 && data.cycle <= data.today ? ` (in ${data.daysToNext} day${data.daysToNext === 1 ? '' : 's'})` : ''}</span>
         </div>
+        <div className="payday-head-side">
+        {isCurrent && monthPlan && monthPlan.incomeExpected > 0 && (() => {
+          const time = cycleProgress(data.today, data.cycle, data.next);
+          const free = monthPlan.freeToSpend;
+          const pot = monthPlan.otherSpending + Math.max(0, free);
+          const used = free < 0 ? 1 : pot > 0 ? monthPlan.otherSpending / pot : 0;
+          return <div className="payday-rings"><PaceRings time={time} money={used} tone={paceTone(time, used, free < 0)} size={72} /><PaceKey time={time} money={used} /></div>;
+        })()}
         <div className="payday-nav">
           <button className="icon-btn" aria-label="Previous payday" onClick={() => setParams('/payday', { cycle: prevCycle })}><Icon name="chevron-left" size={18} /></button>
           {!isCurrent && <button className="btn btn-sm" onClick={() => setParams('/payday', {})}>This payday</button>}
           <button className="icon-btn" aria-label="Next payday" onClick={() => setParams('/payday', { cycle: data.next })}><Icon name="chevron-right" size={18} /></button>
+        </div>
         </div>
       </div>
 
@@ -135,7 +147,7 @@ export function Payday({ params }: { params: URLSearchParams }) {
           <ul className="close-budgets">
             {data.close.budgets.map((b) => (
               <li key={b.id}>
-                <span className="ellipsis">{b.icon} {b.name}</span>
+                <span className="ellipsis cat-label"><CatGlyph icon={b.icon} /> {b.name}</span>
                 <Progress value={b.spent} max={b.limit} />
                 <span className={`small nowrap ${b.over ? 'tone-bad' : 'muted'}`}>{money(b.spent)} of {money(b.limit)}</span>
               </li>
@@ -352,7 +364,7 @@ function BudgetEditor({ data, leftForBudgets, onSaved, done, onUndo }: { data: P
         <tbody>
           {data.budgets.map((b) => (
             <tr key={b.id}>
-              <td><span className="row gap nowrap">{b.icon && <span>{b.icon}</span>}<span className="ellipsis">{b.name}</span>{b.period !== 'monthly' && <span className="tag">{b.period}</span>}</span>
+              <td><span className="row gap nowrap"><CatGlyph icon={b.icon} /><span className="ellipsis">{b.name}</span>{b.period !== 'monthly' && <span className="tag">{b.period}</span>}</span>
                 {b.verdict === 'too-tight' && <span className="tone-warn small block">Over in {b.months - b.under} of {b.months} months</span>}
                 {b.verdict === 'roomy' && <span className="muted small block">Usually well under</span>}</td>
               <td className="num hide-sm muted">{b.typical != null && b.months ? money(b.typical) : '–'}</td>
