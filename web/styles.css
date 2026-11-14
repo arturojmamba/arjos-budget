@@ -924,6 +924,10 @@ kbd { font: 600 11.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding
 .health-list li.health-warn > svg { color: var(--warn-text); }
 .health-list li.health-info > svg { color: var(--info, var(--accent)); }
 .restore { margin-top: 12px; }
+.backup-copy { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.backup-copy h3 { font-size: 15px; margin: 0 0 4px; }
+.backup-copy .badge { margin-right: 6px; }
+.backup-copy p.small { margin-bottom: 10px; }
 @media (max-width: 760px) {
   .tabbar button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--text-3); font-weight: 600; padding: 0; }
   .tabbar button.active { color: var(--accent-text); }

@@ -3,6 +3,15 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.17.0",
+    "date": "2026-11-14",
+    "changes": [
+      "Settings → Data can keep a copy of every backup in iCloud Drive (or any folder you choose), so your data survives losing this computer",
+      "The last 30 copies are kept there, and Settings shows when the last copy was made or why it failed",
+      "Two backups in the same second no longer clash"
+    ]
+  },
+  {
     "version": "1.16.0",
     "date": "2026-11-14",
     "changes": [

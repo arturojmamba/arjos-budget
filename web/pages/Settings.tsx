@@ -166,9 +166,10 @@ function DataCard() {
   const [backupFile, setBackupFile] = useState<string | null>(null);
   async function backup() {
     try {
-      const r = await api.post<{ file: string }>('/api/backup', {});
+      const r = await api.post<{ file: string; copy: CopyStatus | null }>('/api/backup', {});
       setBackupFile(r.file);
-      toast('Backup created');
+      if (r.copy && !r.copy.ok) toast(`Backup created, but the copy failed: ${r.copy.error}`, 'error');
+      else toast(r.copy ? 'Backup created and copied' : 'Backup created');
     } catch (e: any) { toast(e.message, 'error'); }
   }
   const { meta } = useApp();
@@ -186,8 +187,62 @@ function DataCard() {
         <a className="btn" href="/api/export/transactions.csv"><Icon name="download" size={16} /> Export all transactions (CSV)</a>
       </div>
       {backupFile && <p className="muted small">Saved to <code>{backupFile}</code></p>}
+      <BackupCopy />
       <Restore />
     </Card>
+  );
+}
+
+type CopyStatus = { at: string; ok: boolean; file?: string; error?: string };
+type CopyInfo = { folder: string | null; last: CopyStatus | null; icloud: string | null; canPick: boolean };
+
+/** A second copy of each backup somewhere off this computer, usually iCloud Drive. */
+function BackupCopy() {
+  const { toast } = useApp();
+  const [confirm, confirmNode] = useConfirm();
+  const { data, reload } = useData(() => api.get<CopyInfo>('/api/backup/copy'), []);
+  const [busy, setBusy] = useState(false);
+  if (!data) return null;
+  const inICloud = !!data.icloud && data.folder === data.icloud;
+  async function run(fn: () => Promise<CopyInfo & { cancelled?: boolean }>, done: string) {
+    setBusy(true);
+    try { const r = await fn(); if (!r.cancelled) toast(done); reload(); }
+    catch (e: any) { toast(e.message, 'error'); }
+    finally { setBusy(false); }
+  }
+  const useICloud = () => run(() => api.put('/api/backup/copy', { folder: data.icloud }), 'Backups will be copied to iCloud Drive');
+  const pick = () => run(() => api.post('/api/backup/copy/pick', {}), 'Backups will be copied to that folder');
+  async function stop() {
+    if (!(await confirm('Stop copying backups? Copies already in that folder stay there. New backups are only kept on this computer.', { label: 'Stop copying' }))) return;
+    run(() => api.put('/api/backup/copy', { folder: null }), 'Backups are only kept on this computer');
+  }
+  const when = data.last ? new Date(data.last.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+  return (
+    <div className="backup-copy">
+      {confirmNode}
+      <h3>Keep a copy off this computer</h3>
+      {data.folder ? (
+        <>
+          <p className="muted">Each backup is also copied to {inICloud ? <><strong>iCloud Drive → Coil Backups</strong>, and iCloud uploads it from there</> : <code>{data.folder}</code>}. The last 30 are kept there too. Anyone who can open that folder can open the file, so keep it private.</p>
+          {data.last && (data.last.ok
+            ? <p className="small"><Badge tone="good">Copied</Badge> Last copy {when}</p>
+            : <p className="small"><Badge tone="bad">Copy failed</Badge> {when}: {data.last.error}</p>)}
+          <div className="row gap wrap">
+            {data.canPick && <button className="btn" disabled={busy} onClick={pick}><Icon name="archive" size={16} /> Change folder</button>}
+            <button className="btn" disabled={busy} onClick={stop}>Stop copying</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="muted">Backups on this computer won't help if the computer is lost. Coil can put a copy of each one in {data.icloud ? 'iCloud Drive' : 'another folder'} as well{data.icloud ? ', which uploads it' : ', such as one your cloud storage app syncs'}.</p>
+          <div className="row gap wrap">
+            {data.icloud && <button className="btn btn-primary" disabled={busy} onClick={useICloud}><Icon name="archive" size={16} /> Copy to iCloud Drive</button>}
+            {data.canPick && <button className="btn" disabled={busy} onClick={pick}>{data.icloud ? 'Choose another folder' : 'Choose a folder'}</button>}
+          </div>
+          {!data.icloud && !data.canPick && <p className="muted small">Choosing a folder works in the desktop app.</p>}
+        </>
+      )}
+    </div>
   );
 }
 

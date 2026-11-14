@@ -322,6 +322,10 @@ if (!app.requestSingleInstanceLock()) {
       saveT212Key: saveKey,
       clearT212Key: clearKey,
       openDataFolder: () => void shell.openPath(dataDir),
+      pickFolder: async (title) => {
+        const r = await dialog.showOpenDialog({ title, properties: ['openDirectory', 'createDirectory'] });
+        return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+      },
       relaunch: () => { quitting = true; app.relaunch(); app.exit(0); },
       updates: updater ? {
         info: () => updater.info(),

@@ -35,6 +35,7 @@ import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { setEarlierYearTransfer } from './contributions.ts';
 import { payCycle } from './paycycle.ts';
+import { backupAndCopy, copyFolder, lastCopy, setCopyFolder, iCloudDrive, ICLOUD_SUBFOLDER } from './backupcopy.ts';
 import { monthPlan } from './plan.ts';
 import { performance } from './performance.ts';
 import { payday, paydayStatus, setCheck, setPaydayBudgets, completePayday, reopenPayday, paydayLogs, addPaydayItem, deletePaydayItem } from './payday.ts';
@@ -51,7 +52,10 @@ function route(method: string, pathPattern: string, handler: Handler) {
   const pattern = new RegExp(
     '^' + pathPattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$',
   );
-  routes.push({ method, pattern, keys, handler });
+  // createApp registers a few routes per database; a later app replaces an earlier one's (tests run several).
+  const same = routes.findIndex((r) => r.method === method && r.pattern.source === pattern.source);
+  if (same >= 0) routes.splice(same, 1, { method, pattern, keys, handler });
+  else routes.push({ method, pattern, keys, handler });
 }
 
 const int = (v: string | null | undefined) => (v == null || v === '' ? undefined : Number.parseInt(v, 10));
@@ -72,6 +76,8 @@ export interface DesktopHost {
   clearT212Key(): void;
   openDataFolder(): void;
   relaunch(): void;
+  /** Ask for a folder with the system picker; null if cancelled. */
+  pickFolder?(title: string): Promise<string | null>;
   /** Updates from the GitHub releases (installed app only). */
   updates?: {
     info(): unknown;
@@ -492,7 +498,26 @@ export function createApp(db: DB, opts: { staticDir?: string; backupDir: string;
   // The passcode (if any) lives next to the database, not in it.
   const lockFile = opts.lockFile ?? (opts.dbFile && opts.dbFile !== ':memory:' ? path.join(path.dirname(opts.dbFile), 'lock.json') : null);
   lock = lockFile ? new Lock(lockFile) : null;
-  route('POST', '/api/backup', () => ({ file: backup(db, opts.backupDir) }));
+  route('POST', '/api/backup', () => backupAndCopy(db, opts.backupDir));
+  // A copy of each backup in a folder of your choice, e.g. iCloud Drive (which uploads it).
+  const copyInfo = () => {
+    const icloud = iCloudDrive();
+    return { folder: copyFolder(db), last: lastCopy(db), icloud: icloud ? path.join(icloud, ICLOUD_SUBFOLDER) : null, canPick: !!desktop?.pickFolder };
+  };
+  route('GET', '/api/backup/copy', copyInfo);
+  route('PUT', '/api/backup/copy', ({ body }) => {
+    const folder = body?.folder;
+    if (folder !== null && typeof folder !== 'string') throw new ValidationError('folder must be a path or null');
+    setCopyFolder(db, opts.backupDir, folder);
+    return copyInfo();
+  });
+  route('POST', '/api/backup/copy/pick', async () => {
+    const pick = needDesktop().pickFolder;
+    if (!pick) throw new ValidationError('Choosing a folder works in the desktop app');
+    const folder = await pick('Choose where to keep a copy of your backups');
+    if (folder) setCopyFolder(db, opts.backupDir, folder);
+    return { cancelled: !folder, ...copyInfo() };
+  });
   // Clear everything synced from Trading 212 (after a backup) and download it again with the current key.
   route('POST', '/api/t212/reset', () => {
     const accountId = syncedAccounts(db)[0];

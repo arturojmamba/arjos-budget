@@ -570,7 +570,9 @@ export function setSetting(db: DB, key: string, value: string) {
 export function backup(db: DB, dir: string): string {
   fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const file = path.join(dir, `finance-${stamp}.db`);
+  // Two backups in the same second (e.g. choosing a copy folder, then Back up now) get -2, -3…
+  let file = path.join(dir, `finance-${stamp}.db`);
+  for (let n = 2; fs.existsSync(file); n++) file = path.join(dir, `finance-${stamp}-${n}.db`);
   db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
   return file;
 }

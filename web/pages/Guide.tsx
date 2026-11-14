@@ -78,7 +78,7 @@ const PAGES: { name: string; to: string; icon: string; what: string; tips: strin
   { name: 'Categories', to: '/categories', icon: 'tag', what: 'The categories and subcategories your money is sorted into, and the rules that sort it.',
     tips: ['Drag to reorder: the order is used in every picker.', 'Mark income that sometimes arrives a few days early as "counts next month if paid late".'] },
   { name: 'Settings', to: '/settings', icon: 'settings', what: 'Profile, appearance, privacy, passcode, notifications, budgeting months, Trading 212, data and updates.',
-    tips: ['Data has health checks, a Back up now button and restore. A backup is taken automatically every day and the last 30 are kept.', 'Press H anywhere to hide or show amounts.'] },
+    tips: ['Data has health checks, a Back up now button and restore. A backup is taken automatically every day and the last 30 are kept.', 'Turn on Keep a copy off this computer to put each backup in iCloud Drive (or a folder of your choice) as well.', 'Press H anywhere to hide or show amounts.'] },
 ];
 
 const FAQ: { q: string; a: React.ReactNode }[] = [
@@ -86,7 +86,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   { q: 'Why does my salary count towards next month?', a: <>You're paid on the last working day, so pay that lands in the last few days of a month funds the next one: October's payday pays for November. You can change this under <Go to="/settings?tab=budgeting">Settings → Budgeting</Go>.</> },
   { q: 'A balance is wrong. What do I do?', a: <>Usually a statement is missing. Import it, or open the account under <Go to="/accounts">Accounts</Go> and set the balance on a date from your bank statement.</> },
   { q: 'How often should I import?', a: <>Every week or two is plenty. Before payday is a good habit, so the Payday steps see the whole month.</> },
-  { q: 'Where is my data?', a: <>In one file on this computer, never online. See <Go to="/settings?tab=data">Settings → Data</Go> for where it is, backups and export.</> },
+  { q: 'Where is my data?', a: <>In one file on this computer, never online. See <Go to="/settings?tab=data">Settings → Data</Go> for where it is, backups and export. If you turn it on there, a copy of each backup also goes to iCloud Drive or a folder you choose.</> },
   { q: 'How do updates work?', a: <>Coil checks for new versions and shows Restart to update when one is ready. <Go to="/settings?tab=whatsnew">What's new</Go> lists every change.</> },
 ];
 

@@ -12,6 +12,7 @@ import { createApp, type DesktopHost } from './app.ts';
 import { syncedAccounts, trading212Config } from './investments.ts';
 import { syncTrading212Full } from './t212.ts';
 import { autoMatch } from './recurring.ts';
+import { backupAndCopy } from './backupcopy.ts';
 
 export interface StartOptions {
   dbFile: string;
@@ -54,13 +55,14 @@ export async function startServer(o: StartOptions): Promise<Running> {
   const db = openDb(o.dbFile);
   const timers: NodeJS.Timeout[] = [];
 
-  // Daily automatic backup (keeps the last 30).
+  // Daily automatic backup (keeps the last 30), plus a copy in the chosen folder (e.g. iCloud Drive).
   const dailyBackup = () => {
     fs.mkdirSync(o.backupDir, { recursive: true });
     const today = new Date().toISOString().slice(0, 10);
     const existing = fs.readdirSync(o.backupDir).filter((f) => f.endsWith('.db') && !f.startsWith('before-')).sort();
     if (!existing.some((f) => f.includes(today))) {
-      backup(db, o.backupDir);
+      const { copy } = backupAndCopy(db, o.backupDir);
+      if (copy && !copy.ok) log(`Backup copy failed: ${copy.error}`);
       for (const old of existing.slice(0, Math.max(0, existing.length + 1 - 30))) fs.rmSync(path.join(o.backupDir, old));
     }
   };
