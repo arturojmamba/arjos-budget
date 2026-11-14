@@ -274,7 +274,7 @@ function PieCard({ pie, onOpen }: { pie: Pie; onOpen: (t: string) => void }) {
           <tbody>
             {pie.holdings.map((h) => (
               <tr key={h.ticker} onClick={() => onOpen(h.ticker)}>
-                <td><span className="ticker-badge sm">{h.symbol.slice(0, 5)}</span> <span className="ellipsis">{h.name}</span></td>
+                <td><span className="ticker-badge sm">{h.symbol.slice(0, 5)}</span> <span className="ellipsis" title={h.name}>{h.name}</span></td>
                 <td className="num muted">{h.target != null ? pct(h.target) : '–'}</td>
                 <td className="num">{h.current != null ? pct(h.current) : '–'}
                   {h.drift != null && Math.abs(h.drift) >= 0.02 && <span className={`drift ${h.drift > 0 ? 'over' : 'under'}`} title="Away from target">{h.drift > 0 ? '▲' : '▼'}</span>}</td>

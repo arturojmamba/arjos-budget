@@ -61,7 +61,7 @@ export function Categories() {
   const column = (kind: 'expense' | 'income') => {
     const parents = categories.filter((c) => c.kind === kind && c.parentId === null);
     return (
-      <Card title={kind === 'expense' ? 'Spending categories' : 'Income categories'} pad={false}
+      <Card title={kind === 'expense' ? 'Spending categories' : 'Income categories'} pad={false} className={kind === 'income' ? 'cat-side' : undefined}
         action={<button className="btn btn-sm" onClick={() => setEditing({ cat: null, kind })}><Icon name="plus" size={14} /> New</button>}>
         <p className="muted small cat-hint">Drag to reorder, or use the arrows. This is the order used in pickers and lists.</p>
         <ul className="cat-manage">

@@ -3,6 +3,15 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.11.1",
+    "date": "2026-11-14",
+    "changes": [
+      "Accounts: the top tiles fill the row again",
+      "Investing: pie returns show in full; long holding names give way instead",
+      "Categories: Income categories stay in view as you scroll the spending list"
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-11-14",
     "changes": [

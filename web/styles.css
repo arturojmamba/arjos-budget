@@ -1693,3 +1693,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 .carried-mark { margin-left: 2px; color: var(--info-text); font-weight: 700; cursor: help; }
 .icon-pick { display: grid; place-items: center; color: var(--text-2); }
 .emoji-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; }
+
+/* Run-3 fixes. A row of stat tiles shares the width between however many tiles it has. */
+@media (min-width: 1101px) {
+  .stats:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stats:has(> :nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Pie holdings: numbers never get "…"; the holding name gives way instead (full name on hover). */
+.pie-table th:first-child { width: auto; }
+.pie-table th:nth-child(2), .pie-table th:nth-child(3) { width: 60px; }
+.pie-table th:nth-child(4) { width: 92px; }
+.pie-table td.num { overflow: visible; text-overflow: clip; }
+/* Categories: the short Income list stays in view beside the long Spending list. */
+.grid-2-cards > .cat-side { align-self: start; }
+@media (min-width: 1101px) { .grid-2-cards > .cat-side { position: sticky; top: 18px; } }
