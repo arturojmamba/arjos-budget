@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api, type Category, type Rule } from '../api.ts';
-import { Bubble, Card, CategorySelect, AccountSelect, Field, Modal, Segmented, useApp, useConfirm, useData, Empty, Badge } from '../components/ui.tsx';
+import { Bubble, Card, CategorySelect, AccountSelect, Field, Modal, Segmented, useApp, useConfirm, useData, Empty, Badge, usePageAdd } from '../components/ui.tsx';
 import { SuggestedRules, type RuleSuggestion } from '../components/RuleSuggestions.tsx';
 import { setParams, useRoute } from '../router.ts';
-import { Icon, CatGlyph } from '../components/Icon.tsx';
+import { Icon, CatGlyph, CATEGORY_ICONS } from '../components/Icon.tsx';
 import { looksLikeTransfer, shortDate } from '../format.ts';
 
 const COLOURS = ['#16a34a', '#f97316', '#0ea5e9', '#ec4899', '#8b5cf6', '#6366f1', '#eab308', '#b45309', '#14b8a6', '#06b6d4', '#f43f5e', '#3b82f6', '#dc2626', '#059669', '#d946ef', '#64748b'];
@@ -21,6 +21,7 @@ export const EMOJI_GROUPS: { name: string; emojis: string[] }[] = [
 export function Categories() {
   const { categories, refresh, toast } = useApp();
   const [editing, setEditing] = useState<{ cat: Category | null; kind: 'expense' | 'income'; parentId?: number | null } | null>(null);
+  usePageAdd('New category', () => setEditing({ cat: null, kind: 'expense' }));
   const [drag, setDrag] = useState<{ id: number; group: string } | null>(null);
   const [over, setOver] = useState<number | null>(null);
 
@@ -132,7 +133,7 @@ function CategoryForm({ cat, kind, parentId, onClose }: { cat: Category | null; 
   const parent = categories.find((c) => c.id === (cat?.parentId ?? parentId));
   const [name, setName] = useState(cat?.name ?? '');
   const [colour, setColour] = useState(cat?.colour ?? parent?.colour ?? COLOURS[0]);
-  const [icon, setIcon] = useState<string | null>(cat?.icon ?? (parent ? null : '📦'));
+  const [icon, setIcon] = useState<string | null>(cat?.icon ?? (parent ? null : 'package'));
   const [isFixed, setFixed] = useState(cat?.isFixed ?? false);
   const [rollForward, setRollForward] = useState(cat?.rollForward ?? false);
   const [reassign, setReassign] = useState<number | null>(null);
@@ -195,7 +196,7 @@ function CategoryForm({ cat, kind, parentId, onClose }: { cat: Category | null; 
               {COLOURS.map((c) => <button type="button" key={c} className={`swatch ${c === colour ? 'on' : ''}`} style={{ background: c }} onClick={() => setColour(c)} aria-label={`Colour ${c}`} />)}
             </div>
           </Field>
-          <Field label={parent ? 'Emoji (optional)' : 'Emoji'}>
+          <Field label={parent ? 'Icon (optional)' : 'Icon'}>
             <EmojiPicker value={icon} onChange={setIcon} colour={colour} allowNone={!!parent} />
           </Field>
           {kind === 'expense' && looksLikeTransfer(name) && (
@@ -419,21 +420,33 @@ function RuleForm({ rule, onClose, onSaved }: { rule: Rule | null; onClose: () =
 
 export function EmojiPicker({ value, onChange, colour, allowNone }: { value: string | null; onChange: (v: string | null) => void; colour: string; allowNone?: boolean }) {
   const [custom, setCustom] = useState('');
-  const known = EMOJI_GROUPS.some((g) => g.emojis.includes(value ?? ''));
+  const isIcon = !!value && /^[a-z0-9-]+$/.test(value);
+  const known = isIcon || EMOJI_GROUPS.some((g) => g.emojis.includes(value ?? ''));
+  const [moreOpen, setMoreOpen] = useState(!!value && !isIcon);
   return (
     <div className="emoji-picker">
       <div className="emoji-current">
         <Bubble colour={colour} icon={value} label="?" size={44} />
         <div className="stack" style={{ gap: 4 }}>
-          <span className="small muted">Pick one below, or type or paste any emoji (Ctrl ⌘ Space on a Mac).</span>
+          <span className="small muted">Pick an icon below. Prefer an emoji? Choose one under More, or type or paste any emoji.</span>
           <div className="row gap">
             <input className="emoji-input" value={custom} maxLength={8} placeholder={value && !known ? value : '😀'}
               onChange={(e) => { setCustom(e.target.value); if (e.target.value.trim()) onChange(e.target.value.trim()); }} aria-label="Type an emoji" />
-            {allowNone && value && <button type="button" className="link-btn" onClick={() => { onChange(null); setCustom(''); }}>No emoji</button>}
+            {allowNone && value && <button type="button" className="link-btn" onClick={() => { onChange(null); setCustom(''); }}>No icon</button>}
           </div>
         </div>
       </div>
-      {EMOJI_GROUPS.map((g) => (
+      <p className="emoji-group">Icons</p>
+      <div className="emoji-grid">
+        {CATEGORY_ICONS.map((n) => (
+          <button type="button" key={n} className={`emoji-pick icon-pick ${n === value ? 'on' : ''}`} onClick={() => { onChange(n); setCustom(''); }}
+            aria-label={n.replace(/-\d$/, '').replace(/-/g, ' ')} aria-pressed={n === value} style={n === value ? { borderColor: colour, background: `${colour}1a`, color: colour } : undefined}><Icon name={n} size={18} /></button>
+        ))}
+      </div>
+      <button type="button" className="link-btn small emoji-more" onClick={() => setMoreOpen(!moreOpen)} aria-expanded={moreOpen}>
+        {moreOpen ? 'Fewer' : 'More: emoji'} <Icon name={moreOpen ? 'chevron-up' : 'chevron-down'} size={14} />
+      </button>
+      {moreOpen && EMOJI_GROUPS.map((g) => (
         <div key={g.name}>
           <p className="emoji-group">{g.name}</p>
           <div className="emoji-grid">

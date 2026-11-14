@@ -72,17 +72,14 @@ export function Debts() {
         </div>
       )}
 
-      <div className="row gap" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn" onClick={() => setEditing('new-pay3')}><Icon name="plus" size={16} /> Add pay in 3</button>
-        <button className="btn btn-primary" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> Add a loan or debt</button>
-      </div>
 
       <DebtSection title="Credit cards" sub={cards.length ? `${money(owedIn(cards))} on ${cards.length} card${cards.length === 1 ? '' : 's'}` : undefined}
         empty="Add your credit cards on the Accounts page." items={cards} onEdit={setEditing} />
       <DebtSection title="Pay in 3 and buy now, pay later" sub={bnpl.length ? `${money(owedIn(bnpl))} left to pay` : undefined}
+        action={<button className="btn btn-sm" onClick={() => setEditing('new-pay3')}><Icon name="plus" size={14} /> Add pay in 3</button>}
         empty={<>Nothing to pay. Track a Klarna, PayPal or Clearpay plan with <button className="link-btn" onClick={() => setEditing('new-pay3')}>Add pay in 3</button>.</>} items={bnpl} onEdit={setEditing} />
       <DebtSection title="Loans and other debts" sub={loans.length ? `${money(owedIn(loans))} owed` : undefined}
-        empty="No loans. Add a loan, car finance or money you owe someone with “Add a loan or debt”." items={loans} onEdit={setEditing} />
+        empty="No loans. Add a loan, car finance or money you owe someone with Add debt at the top." items={loans} onEdit={setEditing} />
 
       <Timeline />
       <PayoffPlanIfUseful hasDebts={items.some((i) => i.details && !i.details.paysInFull && i.owed > 0)} />
@@ -92,10 +89,10 @@ export function Debts() {
   );
 }
 
-function DebtSection({ title, sub, empty, items, onEdit }: { title: string; sub?: string; empty: React.ReactNode; items: DebtItem[]; onEdit: (d: DebtItem) => void }) {
+function DebtSection({ title, sub, empty, items, onEdit, action }: { title: string; sub?: string; empty: React.ReactNode; items: DebtItem[]; onEdit: (d: DebtItem) => void; action?: React.ReactNode }) {
   return (
     <section className="stack" style={{ gap: 12 }}>
-      <div className="section-head"><h2>{title}</h2>{sub && <span className="muted small">{sub}</span>}</div>
+      <div className="section-head"><h2>{title}</h2>{sub && <span className="muted small">{sub}</span>}{action && <><span className="spacer" />{action}</>}</div>
       {items.length === 0
         ? <p className="muted small debt-empty">{empty}</p>
         : <div className="debt-grid">{items.map((d) => d.details?.schedule ? <PayInCard key={d.accountId} d={d} onEdit={() => onEdit(d)} /> : <DebtCard key={d.accountId} d={d} onEdit={() => onEdit(d)} />)}</div>}
@@ -227,7 +224,7 @@ function DebtCard({ d, onEdit }: { d: DebtItem; onEdit: () => void }) {
         : d.accountType === 'credit_card' && det ? <p className="muted small">Add your statement dates (Edit) to see each statement and its transactions.</p> : null}
 
       {d.history.length >= 2 ? (
-        <div className="debt-history" aria-label="Balance at the end of each month">
+        <div className={`debt-history ${det?.paysInFull ? 'cleared' : ''}`} aria-label="Balance at the end of each month">
           {d.history.map((h) => (
             <span key={h.month} title={`${monthLabel(h.month)}: ${money(h.owed)}`} style={{ height: `${Math.max(2, (h.owed / max) * 36)}px` }} />
           ))}

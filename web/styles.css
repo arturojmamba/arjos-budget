@@ -1675,3 +1675,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 @keyframes ring-draw { from { stroke-dashoffset: var(--len); } }
 @keyframes head-ride { from { transform: rotate(var(--from)); opacity: 0; } 15% { opacity: 1; } }
 :root.reduce-motion .loading { opacity: 1; }
+
+/* ---------- Phase 6: polish ---------- */
+/* The hero's sentence is the answer: never cut it short. */
+.stat-hero .stat-sub { display: block; -webkit-line-clamp: unset; overflow: visible; }
+/* Goals and debts: cards in a row are the same height, and an odd one out spans the row instead of leaving a hole. */
+.goal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.goal-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (max-width: 900px) { .goal-grid { grid-template-columns: minmax(0, 1fr); } }
+.debt-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* Milestone labels: readable at 11px. */
+.milestones span { color: var(--text-2); }
+.milestones span.hit { color: var(--text); }
+/* Cards cleared in full each month: their history isn't debt, so it's neutral. */
+.debt-history.cleared span { background: color-mix(in srgb, var(--spend) 45%, transparent); }
+.debt-history.cleared span:last-child { background: var(--spend); }
+.carried-mark { margin-left: 2px; color: var(--info-text); font-weight: 700; cursor: help; }
+.icon-pick { display: grid; place-items: center; color: var(--text-2); }
+.emoji-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; }

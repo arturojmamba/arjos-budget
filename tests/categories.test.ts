@@ -25,7 +25,9 @@ test('categories use emojis and can be put in any order', () => {
   assert.throws(() => reorderCategories(db, [a, ids[1]]), /same list/);
   updateCategory(db, a, { icon: '🍕' });
   assert.equal(listCategories(db).find((c) => c.id === a)!.icon, '🍕');
-  assert.throws(() => updateCategory(db, a, { icon: 'this is far too long' }), /emoji/);
+  assert.throws(() => updateCategory(db, a, { icon: 'this is far too long' }), /icon/);
+  updateCategory(db, a, { icon: 'shopping-cart' });
+  assert.equal(listCategories(db).find((c) => c.id === a)!.icon, 'shopping-cart');
 });
 
 

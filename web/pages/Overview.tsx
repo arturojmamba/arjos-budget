@@ -259,13 +259,7 @@ function SpendingByCategory({ s, month }: { s: Summary; month: string }) {
   const hiddenTotal = cats.slice(CAT_LIMIT).reduce((t, c) => t + c.amount, 0);
 
   return (
-    <Card title="Spending by category" action={
-      <span className="month-step">
-        <button className="icon-btn" onClick={() => setM(addMonths(m, -1))} disabled={m <= earliest} aria-label="Previous month"><Icon name="chevron-left" size={16} /></button>
-        <span className="small strong">{monthLabel(m, true)} {m.slice(0, 4)}</span>
-        <button className="icon-btn" onClick={() => setM(addMonths(m, 1))} disabled={m >= meta.currentMonth} aria-label="Next month"><Icon name="chevron-right" size={16} /></button>
-      </span>
-    }>
+    <Card title="Spending by category">
       {!view ? <div className="loading" /> : cats.length === 0 ? (
         <Empty icon="shopping-bag" title={`No spending recorded in ${monthLabel(m)}`} />
       ) : (

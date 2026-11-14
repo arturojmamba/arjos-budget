@@ -155,7 +155,7 @@ function BudgetCard({ b, month, isCurrent, onEdit }: { b: BudgetView; month: str
       </div>
       <div className="budget-figures">
         <span className={`budget-left ${over ? 'tone-bad' : ''}`}>{money(Math.abs(b.remaining))} <span className="muted small" style={{ fontWeight: 500, letterSpacing: 0 }}>{over ? 'over' : 'left'}</span></span>
-        <span className="muted small">{money(b.spent)} of {money(b.available)}{b.carried > 0 && <> (incl. {money(b.carried)} rolled over)</>}</span>
+        <span className="muted small" title={b.carried > 0 ? `Includes ${money(b.carried)} left over from last time` : undefined}>{money(b.spent)} of {money(b.available)}{b.carried > 0 && <span className="carried-mark" aria-label={`includes ${money(b.carried)} left over from last time`}>*</span>}</span>
       </div>
       <div className="progress" title={b.pace ? `By today you'd expect to have spent ${money(b.pace.expected)}` : undefined}>
         <span className={`progress-${tone}`} style={{ width: `${Math.min(100, b.pct * 100)}%` }} />

@@ -211,7 +211,7 @@ function validate(db: DB, i: GoalInput) {
   if (i.monthlyTarget != null && !(assertPence(i.monthlyTarget, 'Monthly amount') > 0)) throw new ValidationError('The monthly amount must be more than £0');
   if (i.monthlyPercent != null && (!Number.isInteger(i.monthlyPercent) || i.monthlyPercent <= 0 || i.monthlyPercent > 10000)) throw new ValidationError('Percentage must be between 0.01% and 100%');
   if (i.colour && !/^#[0-9a-fA-F]{6}$/.test(i.colour)) throw new ValidationError('Colour must be a hex value');
-  if (i.icon != null && (typeof i.icon !== 'string' || [...i.icon].length > 8)) throw new ValidationError('Choose an emoji');
+  if (i.icon != null && (typeof i.icon !== 'string' || !(/^[a-z0-9-]{1,32}$/.test(i.icon) || [...i.icon].length <= 8))) throw new ValidationError('Choose an icon');
 }
 
 /** What's free in an account to set aside: the balance less what's already set aside for other goals. */

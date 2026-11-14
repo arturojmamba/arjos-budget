@@ -32,9 +32,6 @@ export function Accounts() {
         <Stat label="What you have" value={<Money value={assets} />} />
         <Stat label="What you owe" value={<Money value={-debts} />} tone={debts < 0 ? 'bad' : undefined} />
         <Stat label="Net worth" value={<Money value={assets + debts} />} />
-        <div className="stat stat-action">
-          <button className="btn btn-primary" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> Add account</button>
-        </div>
       </div>
 
       {groups.map((g) => g.items.length > 0 && (

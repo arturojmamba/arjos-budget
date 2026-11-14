@@ -3,6 +3,19 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.11.0",
+    "date": "2026-11-14",
+    "changes": [
+      "Overview has one month picker, at the top",
+      "One Add button per page: no more repeats on Accounts, Goals and Debts",
+      "Goals and Debts line up with no gaps: cards in a row match, and an odd one out spans the row",
+      "Categories: the top button says New category, and the icon picker offers line icons (emoji are under More)",
+      "Credit cards you clear in full each month show their history in a neutral colour instead of red",
+      "Easier to read goal milestones, and the Free to spend sentence is never cut off on a phone",
+      "Budgets: money carried over from last time is marked with * (hover to see how much)"
+    ]
+  },
+  {
     "version": "1.10.0",
     "date": "2026-11-14",
     "changes": [

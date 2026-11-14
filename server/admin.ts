@@ -168,10 +168,10 @@ export function updateCategory(db: DB, id: number, input: Partial<CategoryInput>
   }
 }
 
-/** An emoji (or short symbol) shown for the category. */
+/** The category's icon: a line-icon name (e.g. "shopping-cart") or an emoji. */
 function iconValue(v: unknown): string | null {
   if (v == null || v === '') return null;
-  if (typeof v !== 'string' || [...v].length > 8) throw new ValidationError('Choose an emoji for the icon');
+  if (typeof v !== 'string' || !(/^[a-z0-9-]{1,32}$/.test(v) || [...v].length <= 8)) throw new ValidationError('Choose an icon');
   return v.trim();
 }
 

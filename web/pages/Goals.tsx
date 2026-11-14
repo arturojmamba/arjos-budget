@@ -52,10 +52,7 @@ export function Goals() {
         <Stat label="Essentials a month" value={<Money value={data.essentials} />} sub="Rent, bills, groceries, transport (3-month average)" />
       </div>
 
-      <div className="row gap" style={{ justifyContent: 'space-between' }}>
-        <p className="muted small">Goals follow the real balance of the account they're in. One account can hold several goals.</p>
-        <button className="btn btn-primary" onClick={() => setEditing({})}><Icon name="plus" size={16} /> New goal</button>
-      </div>
+      <p className="muted small">Goals follow the real balance of the account they're in. One account can hold several goals.</p>
 
       {live.length === 0 && (
         <Card><Empty icon="piggy-bank" title="No goals yet">
@@ -164,7 +161,7 @@ function GoalCard({ g, essentials, onEdit, onMove }: { g: Goal; essentials: numb
 
       {g.target != null && (
         <div className="milestones" aria-hidden="true">
-          {[0.25, 0.5, 0.75, 1].map((m) => <span key={m} className={(g.progress ?? 0) >= m ? 'hit' : ''} style={(g.progress ?? 0) >= m ? { background: g.colour, color: inkOn(g.colour) } : undefined}>{m === 1 ? '🏁' : `${m * 100}%`}</span>)}
+          {[0.25, 0.5, 0.75, 1].map((m) => <span key={m} className={(g.progress ?? 0) >= m ? 'hit' : ''} style={(g.progress ?? 0) >= m ? { background: `color-mix(in srgb, ${g.colour} 22%, var(--surface))`, boxShadow: `inset 0 0 0 1px ${g.colour}` } : undefined}>{m === 1 ? '🏁' : `${m * 100}%`}</span>)}
         </div>
       )}
 
@@ -326,7 +323,7 @@ function GoalForm({ goal, preset, list, onClose }: { goal: Goal | null; preset?:
             </div>
           )}
         </Field>
-        <Field label="Emoji"><EmojiPicker value={icon} onChange={setIcon} colour={goal?.colour ?? accounts.find((a) => a.id === accountId)?.colour ?? '#0ea5e9'} /></Field>
+        <Field label="Icon"><EmojiPicker value={icon} onChange={setIcon} colour={goal?.colour ?? accounts.find((a) => a.id === accountId)?.colour ?? '#0ea5e9'} /></Field>
         <Field label="Notes"><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Flights booked in March" /></Field>
         {error && <p className="form-error">{error}</p>}
       </form>
@@ -428,11 +425,3 @@ export function GoalStrip() {
   );
 }
 
-/** Navy or white, whichever reads better on a goal's colour (4.5:1 where either can). */
-function inkOn(hex: string): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex ?? '');
-  if (!m) return '#fff';
-  const lum = (h: string) => [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((t, c, i) => t + c * [0.2126, 0.7152, 0.0722][i], 0);
-  const l = lum(m[1]);
-  return (l + 0.05) / (lum('0f1a2e') + 0.05) >= 1.05 / (l + 0.05) ? '#0f1a2e' : '#ffffff';
-}
