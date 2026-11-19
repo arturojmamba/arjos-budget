@@ -37,6 +37,8 @@
   --bills: #eab308;
   --subscriptions: #6366f1;
   --wants: #8b5cf6;
+  /* A purchase you're simulating (Can I afford it?). */
+  --purchase: #0d9488;
   /* Net worth series (Reports). */
   --nw-investments: #8b5cf6;
   --nw-cards: #f97316;
@@ -448,7 +450,8 @@ textarea { resize: vertical; }
   .tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); z-index: 40; }
   .tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--text-3); font-weight: 600; }
   .tabbar a.active { color: var(--accent-text); }
-  .add-btn span { display: none; }
+  .add-btn span, .afford-btn span { display: none; }
+  .afford-btn { width: 38px; padding: 0; justify-content: center; }
   .add-btn { width: 38px; padding: 0; justify-content: center; }
   .cat-breakdown { grid-template-columns: 1fr; justify-items: center; }
   .cat-list { width: 100%; }
@@ -521,11 +524,11 @@ input[type=radio] { width: 16px; height: 16px; accent-color: var(--accent); marg
 .isa { display: flex; flex-direction: column; gap: 10px; }
 .isa .progress { height: 10px; }
 @media (max-width: 760px) {
-  .rec-table thead { display: none; }
-  .rec-table tr { display: grid; grid-template-columns: 1fr auto; }
-  .rec-table td { border-top: none; padding: 4px 16px; }
-  .rec-table td:first-child { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 10px; }
-  .rec-table td:nth-child(4), .rec-table td:nth-child(6) { display: none; }
+  .rec-table:not(.keep-table) thead { display: none; }
+  .rec-table:not(.keep-table) tr { display: grid; grid-template-columns: 1fr auto; }
+  .rec-table:not(.keep-table) td { border-top: none; padding: 4px 16px; }
+  .rec-table:not(.keep-table) td:first-child { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 10px; }
+  .rec-table:not(.keep-table) td:nth-child(4), .rec-table:not(.keep-table) td:nth-child(6) { display: none; }
   .stats-3 { grid-template-columns: 1fr; }
   .due .badge-info { display: none; }
   .due .btn { height: 30px; padding: 0 10px; font-size: 12.5px; }
@@ -1767,3 +1770,78 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 .plan-wide .plan-list li > .plan-link > .grow { grid-column: 2; }
 .plan-wide .plan-list li > .plan-link > .money { grid-column: 2; font-size: 17px; font-weight: 650; }
 .plan-wide .plan-list li > .plan-link > .plan-chev { grid-column: 3; grid-row: 1 / span 2; }
+
+/* ---------- Can I afford it? ---------- */
+.afford .between { justify-content: space-between; }
+.afford { display: flex; flex-direction: column; gap: 18px; }
+.afford-missing { margin: 4px 0 0; padding-left: 18px; }
+.afford-form { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.afford-actions { margin-top: 14px; }
+.afford-verdict .verdict-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.verdict-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+.verdict-icon.tone-good { background: var(--good-soft); color: var(--good-text); }
+.verdict-icon.tone-info { background: var(--info-soft); color: var(--info-text); }
+.verdict-icon.tone-warn { background: var(--warn-soft); color: var(--warn-text); }
+.verdict-icon.tone-bad { background: var(--bad-soft); color: var(--bad-text); }
+.verdict-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.verdict-reasons, .verdict-adjust ul, .confirm-list { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; }
+.verdict-adjust { background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; }
+.verdict-adjust ul { margin: 4px 0 0; }
+.verdict-checks { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px 18px; font-size: 13.5px; }
+.verdict-checks li { display: flex; gap: 8px; align-items: flex-start; }
+.verdict-checks li svg { flex-shrink: 0; margin-top: 3px; }
+.verdict-checks li.ok svg { color: var(--good-text); }
+.verdict-checks li.no svg { color: var(--bad-text); }
+.verdict-warn p { margin: 0 0 6px; color: var(--text-2); display: flex; gap: 6px; align-items: flex-start; }
+.verdict-warn svg { flex-shrink: 0; margin-top: 2px; }
+.verdict-actions { margin-top: 6px; }
+.afford-best { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--good-soft); color: var(--good-text); font-size: 13.5px; }
+.afford-best.bad { background: var(--bad-soft); color: var(--bad-text); }
+.afford-best svg { flex-shrink: 0; margin-top: 2px; }
+.afford-options .card-body, .afford-options > div { min-width: 0; }
+.afford-table { min-width: 760px; }
+.afford-table tr.is-selected td { background: var(--accent-soft); }
+.afford-table .opt-name { display: flex; gap: 10px; align-items: flex-start; }
+.afford-table .opt-name input { margin-top: 3px; accent-color: var(--accent); }
+.afford-table .opt-label { font-weight: 600; display: block; }
+.afford-table .opt-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+.kind-tag { font-size: 11.5px; color: var(--text-2); }
+.bad-text { color: var(--bad-text); }
+.add-option { width: auto; height: 30px; padding: 0 30px 0 12px; font-size: 13px; }
+.afford-editor fieldset, .overrides { border: 0; padding: 0; margin: 0; min-width: 0; }
+.afford-editor-body { display: flex; flex-direction: column; gap: 12px; }
+.afford-editor-body .grid-4 { align-items: start; }
+.afford-save-line { margin: 0; line-height: 1.5; }
+.save-alts { display: flex; flex-wrap: wrap; gap: 8px; }
+.save-alts .is-on { border-color: var(--accent); background: var(--accent-soft); }
+.chart-note { margin: 0 0 10px; line-height: 1.5; }
+.sched-table td, .sched-table th { white-space: nowrap; }
+.sched-total { margin: 10px 0 0; color: var(--text-2); }
+.goal-new { background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; }
+.goal-new p { margin: 4px 0 0; }
+.goal-impact, .assumptions, .acc-pool { list-style: none; margin: 0; padding: 0; }
+.goal-impact li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+.goal-impact li:first-child { border-top: 0; }
+.assumptions li { display: grid; grid-template-columns: minmax(120px, 0.8fr) minmax(0, 2fr); gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); font-size: 13.5px; line-height: 1.45; }
+.assumptions li:first-child { border-top: 0; }
+.overrides { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+.overrides p { margin: 0; }
+.acc-pool li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.acc-pool .amount-field { max-width: 150px; }
+.acc-head { margin-top: 4px; }
+.saved-note { margin: 0; padding: 14px 20px 10px; }
+.saved-table { min-width: 820px; }
+.end-row { justify-content: flex-end; flex-wrap: nowrap; }
+@media (max-width: 900px) { .afford .grid-2-cards { grid-template-columns: minmax(0, 1fr); } }
+.afford-btn { text-decoration: none; }
+.afford-form-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.afford-form-foot { margin: 0; }
+.afford-schedule { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+.sched-head { margin-bottom: 6px; }
+.afford-schedule .rec-table th:first-child, .afford-schedule .rec-table td:first-child { padding-left: 0; }
+.afford-schedule .rec-table tbody tr { cursor: default; }
+@media (max-width: 900px) { .afford-form-row { grid-template-columns: minmax(0, 1fr); } }
+.verdict-good .verdict-title { color: var(--good-text); }
+.verdict-info .verdict-title { color: var(--info-text); }
+.verdict-warn .verdict-title { color: var(--warn-text); }
+.verdict-bad .verdict-title { color: var(--bad-text); }

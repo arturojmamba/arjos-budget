@@ -17,7 +17,7 @@ test('nothing scrolls vertically inside a card (lists page instead)', () => {
 });
 
 // DESIGN.md › Colors and web/series.ts: the Plan's series colours are tokens, never hex in a page.
-const PLAN_PAGES = ['Bills', 'Payday', 'Overview', 'Reports', 'Budgets', 'Debts', 'Goals', 'Transactions'];
+const PLAN_PAGES = ['Afford', 'Bills', 'Payday', 'Overview', 'Reports', 'Budgets', 'Debts', 'Goals', 'Transactions'];
 
 test('pages take plan and status colours from tokens, not hex', () => {
   const offenders: string[] = [];

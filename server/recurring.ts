@@ -234,6 +234,33 @@ function candidates(db: DB, r: RecurringRow, due: string, anyAccount = false): C
 }
 
 /**
+ * Spending in a month that was really one of today's bills or subscriptions but was never linked to it
+ * (usually because the bill was set up later). Matched by name, or by category and a similar amount.
+ * Used to keep bills out of a day-to-day spending average, so they aren't counted twice.
+ */
+export function unlinkedBillSpending(db: DB, month: string): number {
+  const bills = db.prepare("SELECT * FROM recurring WHERE active = 1 AND type IN ('bill','subscription')").all() as unknown as RecurringRow[];
+  if (!bills.length) return 0;
+  const rows = db.prepare(
+    `SELECT t.id, t.date, t.description, IFNULL(t.merchant, '') AS merchant, -SUM(p.amount) AS spent, MAX(p.category_id) AS category_id
+     FROM transactions t JOIN postings p ON p.transaction_id = t.id
+     WHERE t.kind = 'expense' AND t.period = ? AND NOT EXISTS (SELECT 1 FROM recurring_payments rp WHERE rp.transaction_id = t.id)
+     GROUP BY t.id HAVING spent > 0`,
+  ).all(month).map((x: any) => ({ ...x, amount: x.spent })) as unknown as (Candidate & { category_id: number | null })[];
+  let n = 0;
+  for (const c of rows) {
+    const hit = bills.some((r) => {
+      const expected = r.amount;
+      const near = Math.abs(c.amount - expected) <= Math.max(expected * 0.1, 100);
+      return (matchesPattern(r, c) && (r.variable || Math.abs(c.amount - expected) <= Math.max(expected * 0.5, 100)))
+        || (r.category_id != null && c.category_id === r.category_id && near);
+    });
+    if (hit) n += c.amount;
+  }
+  return n;
+}
+
+/**
  * Link due dates to real transactions. Runs after imports and edits, and
  * whenever bills are viewed. Also keeps the expected amount in line with
  * what you actually paid most recently, so price rises are picked up.
@@ -276,13 +303,40 @@ export function autoMatch(db: DB, onlyId?: number) {
           if (!exact) continue;
           db.prepare('UPDATE recurring_payments SET transaction_id = ?, amount = ?, paid_date = ? WHERE recurring_id = ? AND due_date = ?')
             .run(exact.id, exact.amount, exact.date, r.id, due);
+          recordPlanInterest(db, r.id, due, exact.date);
           continue;
         }
         db.prepare("INSERT INTO recurring_payments (recurring_id, due_date, status, transaction_id, amount, paid_date) VALUES (?, ?, 'paid', ?, ?, ?)")
           .run(r.id, due, best!.id, best!.amount, best!.date);
+        recordPlanInterest(db, r.id, due, best!.date);
       }
       syncAmountFromPayments(db, r);
     });
+  }
+}
+
+/**
+ * A repayment on a purchase confirmed in Can I afford it?: once it's paid, the interest and fees in it
+ * (from the agreement's schedule) are recorded as spending on the debt, the way a card statement shows
+ * interest. So the debt goes down by exactly the part that repays it, and the interest counts once.
+ */
+export function recordPlanInterest(db: DB, recurringId: number, due: string, date: string) {
+  const plans = db.prepare(
+    "SELECT id, name, debt_account_id, schedule, created_ids FROM purchase_plans WHERE status = 'bought' AND schedule IS NOT NULL AND debt_account_id IS NOT NULL",
+  ).all() as { id: number; name: string; debt_account_id: number; schedule: string; created_ids: string | null }[];
+  for (const p of plans) {
+    const row = (JSON.parse(p.schedule) as { recurringId: number | null; date: string; interest: number; fees: number }[])
+      .find((x) => x.recurringId === recurringId && x.date === due);
+    if (!row || row.interest + row.fees <= 0) continue;
+    const created = p.created_ids ? JSON.parse(p.created_ids) : {};
+    const key = `${recurringId}:${due}`;
+    created.interest = created.interest ?? {};
+    if (created.interest[key] && db.prepare('SELECT 1 FROM transactions WHERE id = ?').get(created.interest[key])) continue;
+    const cat = (db.prepare("SELECT id FROM categories WHERE name = 'Interest & Fees' AND kind = 'expense'").get() as { id: number } | undefined)?.id ?? null;
+    created.interest[key] = createTransaction(db, simpleToPostings({
+      kind: 'expense', date, description: `Interest and fees: ${p.name}`, accountId: p.debt_account_id, categoryId: cat, amount: row.interest + row.fees,
+    } as any));
+    db.prepare('UPDATE purchase_plans SET created_ids = ? WHERE id = ?').run(JSON.stringify(created), p.id);
   }
 }
 
@@ -377,6 +431,7 @@ export function setPayment(db: DB, recurringId: number, i: PaymentInput) {
     }
     db.prepare("INSERT INTO recurring_payments (recurring_id, due_date, status, transaction_id, amount, paid_date) VALUES (?, ?, 'paid', ?, ?, ?)")
       .run(recurringId, i.dueDate, txnId, amount, paidDate);
+    recordPlanInterest(db, recurringId, i.dueDate, paidDate);
     syncAmountFromPayments(db, r);
   });
 }

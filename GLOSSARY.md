@@ -59,3 +59,28 @@ _Avoid_: Left over, disposable income, buffer
 **Buffer**:
 What's left of your pay after the Payday plan gives every pound a job: committed money plus budgets.
 _Avoid_: Free to spend (that's after actual spending, not budgets), spare
+
+## Can I afford it?
+
+**Simulation**:
+A purchase you're trying out, with the ways you might pay for it. Only inputs: saving, changing or deleting one never changes your money.
+_Avoid_: Scenario, plan (Plan is the This month card)
+
+**Available money**:
+What a simulation can spend: current accounts, plus savings less goal money and the emergency fund. Investments are left out. You can count more for one simulation.
+_Avoid_: Balance, disposable income, spare cash
+
+**Way to pay**:
+One option in a simulation: pay outright, buy now pay later, instalments, a finance agreement, a credit card, or save first.
+_Avoid_: Payment method, plan
+
+**Interest-free (0%) finance**:
+Regulated credit with no interest (a credit agreement). Different from **Buy now, pay later** (short, unregulated, interest-free split payments such as Pay in 3) and **Interest-bearing credit** (an APR above 0%).
+
+**Result**:
+A simulation's verdict on a way to pay: Comfortably affordable, Affordable with adjustments, Financially stretching, or Not currently affordable.
+_Avoid_: Score, rating
+
+**Free to spend minimum**:
+How much Free to spend a month must keep for a purchase to count as comfortable: 10% of that month's income unless you change it.
+_Avoid_: Buffer (that's the Payday plan's leftover)

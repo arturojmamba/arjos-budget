@@ -3,6 +3,19 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.18.0",
+    "date": "2026-11-19",
+    "changes": [
+      "New: Can I afford it? Try a purchase before you buy it, against your real balances, pay, bills, debts, saving and spending, day by day",
+      "Compare paying outright, pay in 3 or 4, pay in 30 days, instalments, finance (with a balloon payment), a credit card or saving first, side by side",
+      "Each way to pay gets a clear result with the reasons, what would make it work, and the effect on your goals; the best balance is pointed out",
+      "Your emergency fund, goal money and investments aren't counted as spare unless you choose to, and you can change any figure for one simulation",
+      "Save simulations to compare later; I've bought it adds the debt, repayments or one-off payment for you, and Save for this adds a goal",
+      "Interest on a finance plan is recorded as each payment is made, so the debt clears exactly and the purchase is only counted once",
+      "Credit cards can have a credit limit (Debts → card details)"
+    ]
+  },
+  {
     "version": "1.17.0",
     "date": "2026-11-14",
     "changes": [

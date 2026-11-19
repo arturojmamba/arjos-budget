@@ -498,6 +498,32 @@ export const MIGRATIONS: string[] = [
    WHERE name = 'Debt Repayment' AND kind = 'expense'
      AND NOT EXISTS (SELECT 1 FROM categories c2 WHERE c2.name = 'Paying people back' AND c2.kind = 'expense');
   `,
+  // v17 — Can I afford it?: saved purchase simulations, and credit limits on cards.
+  // A simulation is only inputs: nothing in your accounts changes until you confirm a purchase, and
+  // then the links say which debt, goal and Bills & income items it created.
+  `
+  ALTER TABLE debts ADD COLUMN credit_limit INTEGER CHECK (credit_limit IS NULL OR credit_limit >= 0);
+  CREATE TABLE purchase_plans (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL CHECK (price > 0),
+    purchase_date TEXT NOT NULL,
+    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    description TEXT,
+    priority TEXT NOT NULL DEFAULT 'important' CHECK (priority IN ('essential','important','non_essential')),
+    status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','bought','dropped')),
+    inputs TEXT NOT NULL,
+    chosen_option TEXT,
+    bought_at TEXT,
+    debt_account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+    goal_id INTEGER REFERENCES goals(id) ON DELETE SET NULL,
+    recurring_id INTEGER REFERENCES recurring(id) ON DELETE SET NULL,
+    created_ids TEXT,
+    schedule TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  `,
 ];
 
 export function openDb(file: string): DB {

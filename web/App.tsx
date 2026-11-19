@@ -20,6 +20,7 @@ import { Payday } from './pages/Payday.tsx';
 import { Bills } from './pages/Bills.tsx';
 import { Goals } from './pages/Goals.tsx';
 import { Reports } from './pages/Reports.tsx';
+import { Afford } from './pages/Afford.tsx';
 
 const TAB_PATHS = ['/', '/transactions', '/budgets', '/bills'];
 
@@ -38,6 +39,7 @@ const NAV_GROUPS: { label: string | null; items: { path: string; label: string; 
     { path: '/payday', label: 'Payday', icon: 'cash' },
     { path: '/budgets', label: 'Budgets', icon: 'piggy-bank' },
     { path: '/goals', label: 'Goals', icon: 'gift' },
+    { path: '/afford', label: 'Can I afford it?', icon: 'scale' },
   ] },
   { label: 'Wealth', items: [
     { path: '/accounts', label: 'Accounts', icon: 'wallet' },
@@ -52,10 +54,10 @@ const NAV_GROUPS: { label: string | null; items: { path: string; label: string; 
 const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
 /** "g" then a letter jumps to a page. */
-const JUMP: Record<string, string> = { o: '/', t: '/transactions', b: '/budgets', g: '/goals', i: '/bills', p: '/payday', d: '/debts', r: '/reports', v: '/investing', a: '/accounts', c: '/categories', m: '/import', s: '/settings' };
+const JUMP: Record<string, string> = { o: '/', f: '/afford', t: '/transactions', b: '/budgets', g: '/goals', i: '/bills', p: '/payday', d: '/debts', r: '/reports', v: '/investing', a: '/accounts', c: '/categories', m: '/import', s: '/settings' };
 const SHORTCUTS: [string, string][] = [
   ['N', 'Add a transaction'], ['H', 'Hide or show amounts'], ['/', 'Search transactions'], ['← →', 'Previous or next month (Overview, Budgets)'], ['?', 'Show these shortcuts'],
-  ['G then O', 'Overview'], ['G then T', 'Transactions'], ['G then B', 'Budgets'], ['G then G', 'Goals'], ['G then I', 'Bills and income'], ['G then P', 'Payday'],
+  ['G then O', 'Overview'], ['G then T', 'Transactions'], ['G then B', 'Budgets'], ['G then G', 'Goals'], ['G then F', 'Can I afford it?'], ['G then I', 'Bills and income'], ['G then P', 'Payday'],
   ['G then D', 'Debts'], ['G then R', 'Reports'], ['G then V', 'Investing'], ['G then A', 'Accounts'], ['G then C', 'Categories'], ['G then M', 'Import'], ['G then S', 'Settings'],
 ];
 
@@ -188,6 +190,7 @@ export function App() {
               aria-label={hidden ? 'Show balances' : 'Hide balances'} title={`${hidden ? 'Show' : 'Hide'} balances (H)`}>
               <Icon name={hidden ? 'eye-off' : 'eye'} size={19} />
             </button>
+            {page.path === '/' && <a className="btn afford-btn" href="#/afford" title="Try a purchase before you buy it (G then F)"><Icon name="scale" size={16} /> <span>Can I afford it?</span></a>}
             <button className="btn btn-primary add-btn" onClick={() => (pageAdd ? pageAdd.run() : setAdding(true))} title={pageAdd ? pageAdd.label : 'Add transaction (N)'} aria-label={pageAdd ? pageAdd.label : 'Add transaction'}><Icon name="plus" size={16} /> <span>{pageAdd ? pageAdd.label : 'Add transaction'}</span></button>
           </header>
 
@@ -204,6 +207,7 @@ export function App() {
           {page.path === '/settings' && <Settings />}
           {page.path === '/investing' && <Investing />}
           {page.path === '/payday' && <Payday params={params} />}
+          {page.path === '/afford' && <Afford params={params} />}
         </main>
 
         <nav className="tabbar">

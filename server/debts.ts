@@ -30,7 +30,7 @@ interface DebtRow {
   account_id: number; debt_type: DebtType; original_balance: number; apr: number; promo_apr: number | null; promo_end: string | null;
   min_type: 'fixed' | 'card'; min_fixed: number; min_percent: number; min_floor: number; due_day: number | null;
   frequency: 'weekly' | 'fortnightly' | 'four_weekly' | 'monthly'; pays_in_full: number; payment_account_id: number | null; notes: string | null;
-  start_date: string | null; instalments: number | null; provider: string | null; statement_day: number | null;
+  start_date: string | null; instalments: number | null; provider: string | null; statement_day: number | null; credit_limit: number | null;
 }
 
 export interface DebtInput {
@@ -55,6 +55,8 @@ export interface DebtInput {
   provider?: string | null;
   /** Credit cards: the day of the month each statement closes (its "to" date). */
   statementDay?: number | null;
+  /** Credit cards: the credit limit, if you've told us. */
+  creditLimit?: number | null;
 }
 
 export const PAY_IN_PROVIDERS = ['Klarna', 'PayPal', 'Clearpay', 'Monzo Flex', 'Zilch', 'Other'];
@@ -120,6 +122,7 @@ function validate(db: DB, i: DebtInput) {
   if (i.minFloor !== undefined) assertPence(i.minFloor, 'Minimum floor');
   if (i.minPercent !== undefined && (!Number.isInteger(i.minPercent) || i.minPercent < 0 || i.minPercent > 10000)) throw new ValidationError('Minimum percentage must be between 0 and 100');
   if (i.dueDay != null && (!Number.isInteger(i.dueDay) || i.dueDay < 1 || i.dueDay > 31)) throw new ValidationError('Due day must be 1–31');
+  if (i.creditLimit != null && (assertPence(i.creditLimit, 'Credit limit') < 0)) throw new ValidationError('Credit limit cannot be negative');
   if (i.statementDay != null && (!Number.isInteger(i.statementDay) || i.statementDay < 1 || i.statementDay > 31)) throw new ValidationError('Statement end day must be 1–31');
   if (i.paymentAccountId != null) {
     const a = db.prepare('SELECT type FROM accounts WHERE id = ?').get(i.paymentAccountId) as { type: string } | undefined;
@@ -134,19 +137,21 @@ export function upsertDebt(db: DB, accountId: number, i: DebtInput) {
   if (!isLiability(acc.type)) throw new ValidationError('Debt details are for credit cards, loans and other debts');
   validate(db, i);
   db.prepare(
-    `INSERT INTO debts (account_id, debt_type, original_balance, apr, promo_apr, promo_end, min_type, min_fixed, min_percent, min_floor, due_day, frequency, pays_in_full, payment_account_id, notes, start_date, instalments, provider, statement_day)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO debts (account_id, debt_type, original_balance, apr, promo_apr, promo_end, min_type, min_fixed, min_percent, min_floor, due_day, frequency, pays_in_full, payment_account_id, notes, start_date, instalments, provider, statement_day, credit_limit)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(account_id) DO UPDATE SET debt_type = excluded.debt_type, original_balance = excluded.original_balance, apr = excluded.apr,
        promo_apr = excluded.promo_apr, promo_end = excluded.promo_end, min_type = excluded.min_type, min_fixed = excluded.min_fixed,
        min_percent = excluded.min_percent, min_floor = excluded.min_floor, due_day = excluded.due_day, frequency = excluded.frequency,
        pays_in_full = excluded.pays_in_full, payment_account_id = excluded.payment_account_id, notes = excluded.notes,
-       start_date = excluded.start_date, instalments = excluded.instalments, provider = excluded.provider, statement_day = excluded.statement_day`,
+       start_date = excluded.start_date, instalments = excluded.instalments, provider = excluded.provider, statement_day = excluded.statement_day,
+       credit_limit = excluded.credit_limit`,
   ).run(
     accountId, i.debtType, i.originalBalance, i.apr, i.promoApr ?? null, i.promoApr != null ? i.promoEnd ?? null : null, i.minType,
     i.minFixed ?? 0, i.minPercent ?? 100, i.minFloor ?? 2500, i.dueDay ?? null, i.frequency ?? 'monthly', i.paysInFull ? 1 : 0,
     i.paymentAccountId ?? null, i.notes?.trim() || null,
     i.debtType === 'pay_in_3' ? i.startDate! : null, i.debtType === 'pay_in_3' ? i.instalments! : null, i.provider?.trim() || null,
     i.debtType === 'credit_card' ? i.statementDay ?? null : null,
+    i.debtType === 'credit_card' ? i.creditLimit ?? null : null,
   );
 }
 
@@ -538,6 +543,7 @@ export function listDebts(db: DB, today = todayIso()) {
         startDate: d.start_date, instalments: d.instalments, provider: d.provider,
         schedule, overdue: !!nextInstalment && nextInstalment.date < today,
         statementDay: d.statement_day, statements: stmts, statementDue,
+        creditLimit: d.credit_limit, availableCredit: d.credit_limit != null ? d.credit_limit - owed : null,
         finalDate: schedule ? schedule[schedule.length - 1].date : null,
         atMinimum: sim ? { months: sim.months, debtFree: sim.debtFree, totalInterest: sim.totalInterest, never: sim.never } : null,
       };

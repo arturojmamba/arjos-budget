@@ -17,6 +17,7 @@ interface Details {
   startDate: string | null; instalments: number | null; provider: string | null; finalDate: string | null; overdue: boolean;
   schedule: { n: number; date: string; amount: number; paid: boolean; outstanding: number }[] | null;
   statementDay: number | null; statementDue: number | null; statements: Statement[] | null;
+  creditLimit: number | null; availableCredit: number | null;
   atMinimum: { months: number | null; debtFree: string | null; totalInterest: number; never: boolean } | null;
 }
 interface DebtItem {
@@ -561,6 +562,7 @@ function DebtForm({ item, startType, onClose }: { item: DebtItem | null; startTy
   const [minFloor, setMinFloor] = useState(det ? penceToInput(det.minFloor) : '25.00');
   const [frequency, setFrequency] = useState(det?.frequency ?? 'monthly');
   const [paysInFull, setPaysInFull] = useState(det?.paysInFull ?? false);
+  const [creditLimit, setCreditLimit] = useState(det?.creditLimit != null ? penceToInput(det.creditLimit) : '');
   const [payFrom, setPayFrom] = useState<number | null>(det?.paymentAccountId ?? accounts.find((a) => a.type === 'current')?.id ?? null);
   const [notes, setNotes] = useState(det?.notes ?? '');
   const [addRepayment, setAddRepayment] = useState(true);
@@ -594,7 +596,9 @@ function DebtForm({ item, startType, onClose }: { item: DebtItem | null; startTy
       minType: isCard ? minType : 'fixed', minFixed: parseAmount(minFixed) ?? 0, minPercent: bp(minPercent || '0'), minFloor: parseAmount(minFloor) ?? 0,
       dueDay: dueDate ? Number(dueDate.slice(8, 10)) : null, statementDay: isCard && stmtTo ? Number(stmtTo.slice(8, 10)) : null, frequency: minType === 'fixed' || !isCard ? frequency : 'monthly',
       paysInFull: isCard && paysInFull, paymentAccountId: payFrom, notes,
+      creditLimit: isCard && creditLimit.trim() ? parseAmount(creditLimit) : null,
     };
+    if (isCard && creditLimit.trim() && body.creditLimit == null) return setError('Credit limit should be an amount, e.g. 4000');
     if ([body.apr, body.minPercent].some((v) => Number.isNaN(v))) return setError('Rates should be numbers, e.g. 24.9');
     try {
       if (item) await api.put(`/api/debts/${item.accountId}`, body);
@@ -645,6 +649,11 @@ function DebtForm({ item, startType, onClose }: { item: DebtItem | null; startTy
         {isCard && (
           <label className="check"><input type="checkbox" checked={paysInFull} onChange={(e) => setPaysInFull(e.target.checked)} />
             <span><strong>I pay the full balance every month</strong><br /><span className="muted small">No interest, and it's left out of payoff plans. Charge cards work like this.</span></span></label>
+        )}
+        {isCard && (
+          <Field label="Credit limit" hint="Optional. Lets Can I afford it? check a purchase fits on the card.">
+            <div className="amount-field" style={{ maxWidth: 200 }}><span>£</span><input inputMode="decimal" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} placeholder="4000.00" /></div>
+          </Field>
         )}
         {isCard && (
           <Field label="Latest statement" hint="From your last statement. Each one runs to the same day every month, starting the day after the previous one ends.">

@@ -7,6 +7,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { openDb, setSetting } from '../server/db.ts';
 import { getAppearance, getProfile } from '../server/personal.ts';
 
+/** Undo the parts of later migrations that add tables or columns, to rewind a database to version 14. */
+const UNDO_LATER = 'DROP TABLE purchase_plans; ALTER TABLE debts DROP COLUMN credit_limit;';
+
 test('the Coil restyle: the old default coral and name move over, your own choices stay', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coil-'));
   const file = path.join(dir, 'finance.db');
@@ -15,6 +18,7 @@ test('the Coil restyle: the old default coral and name move over, your own choic
   setSetting(db, 'appearance', JSON.stringify({ theme: 'dark', accent: '#ff5b45' }));
   setSetting(db, 'profile', JSON.stringify({ name: 'Alex', appName: 'Ledger' }));
   db.exec('PRAGMA user_version = 14');
+  db.exec(UNDO_LATER); // what later versions added didn't exist yet
   db.close();
   const again = openDb(file);
   assert.equal(getAppearance(again).accent, '#d9c08e');
@@ -27,6 +31,7 @@ test('the Coil restyle: the old default coral and name move over, your own choic
   raw.prepare("UPDATE settings SET value = ? WHERE key = 'appearance'").run(JSON.stringify({ accent: '#2563eb' }));
   raw.prepare("UPDATE settings SET value = ? WHERE key = 'profile'").run(JSON.stringify({ name: 'Alex', appName: 'My money' }));
   raw.exec('PRAGMA user_version = 14');
+  raw.exec(UNDO_LATER);
   raw.close();
   const third = openDb(file);
   assert.equal(getAppearance(third).accent, '#2563eb');

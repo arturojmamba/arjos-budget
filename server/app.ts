@@ -35,6 +35,8 @@ import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { setEarlierYearTransfer } from './contributions.ts';
 import { payCycle } from './paycycle.ts';
+import { loadContext, simulate as simulatePurchase, type Context as AffordContext } from './afford.ts';
+import { validateInput, listPlans, getPlan, createPlan, updatePlan, setPlanStatus, deletePlan, confirmPurchase } from './purchases.ts';
 import { backupAndCopy, copyFolder, lastCopy, setCopyFolder, iCloudDrive, ICLOUD_SUBFOLDER } from './backupcopy.ts';
 import { monthPlan } from './plan.ts';
 import { performance } from './performance.ts';
@@ -426,6 +428,34 @@ route('PUT', '/api/desktop/update/auto', ({ body }) => {
   u.setAuto(body?.on !== false);
   return { supported: true, ...(u.info() as object) };
 });
+// ---------- Can I afford it? ----------
+// Your figures are read once and reused for a few seconds, so the forecast updates as you type.
+const affordCache = new WeakMap<DB, { at: number; ctx: AffordContext }>();
+function affordContext(db: DB): AffordContext {
+  const hit = affordCache.get(db);
+  if (hit && Date.now() - hit.at < 10_000 && hit.ctx.today === todayIso()) return hit.ctx;
+  const ctx = loadContext(db);
+  affordCache.set(db, { at: Date.now(), ctx });
+  return ctx;
+}
+route('GET', '/api/afford/context', ({ db }) => {
+  affordCache.delete(db);
+  const c = affordContext(db);
+  return {
+    today: c.today, accounts: c.accounts, cards: c.cards.map(({ repayments, ...x }) => x), goals: c.goals,
+    pay: c.pay, everyday: c.everyday, savingPerMonth: c.savingPerMonth, missing: c.missing,
+    firstPayday: c.events.find((e) => e.isPay)?.date ?? null,
+  };
+});
+route('POST', '/api/afford/simulate', ({ db, body }) => simulatePurchase(affordContext(db), validateInput(body)));
+route('GET', '/api/afford/plans', ({ db }) => listPlans(db));
+route('GET', '/api/afford/plans/:id', ({ db, params }) => getPlan(db, id(params)));
+route('POST', '/api/afford/plans', ({ db, body }) => ({ id: createPlan(db, body) }));
+route('PUT', '/api/afford/plans/:id', ({ db, params, body }) => { updatePlan(db, id(params), body); return getPlan(db, id(params)); });
+route('PUT', '/api/afford/plans/:id/status', ({ db, params, body }) => { setPlanStatus(db, id(params), body?.status); return getPlan(db, id(params)); });
+route('DELETE', '/api/afford/plans/:id', ({ db, params }) => { deletePlan(db, id(params)); return { ok: true }; });
+route('POST', '/api/afford/plans/:id/confirm', ({ db, params, body }) => { const r = confirmPurchase(db, id(params), body ?? {}); affordCache.delete(db); return r; });
+
 // ---------- Notifications (desktop app) ----------
 const notifyState = (db: Parameters<typeof notifySettings>[0]) => {
   const n = desktop?.notifications;

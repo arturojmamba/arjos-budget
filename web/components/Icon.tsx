@@ -67,6 +67,7 @@ const PATHS: Record<string, string> = {
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
   package: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5M8 5.3l8 4.5',
+  scale: 'M12 3v18M7 21h10M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2M16 16l3-8 3 8a4.4 4.4 0 0 1-6 0zM2 16l3-8 3 8a4.4 4.4 0 0 1-6 0z',
   target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
   dumbbell: 'M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12',
   pill: 'M10.5 20.5a5 5 0 0 1-7-7l6-6a5 5 0 0 1 7 7l-6 6zM7.5 10.5l6 6',
