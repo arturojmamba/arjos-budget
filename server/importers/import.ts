@@ -11,7 +11,7 @@ import { smartCategory } from './smart.ts';
 const MATCH_WINDOW_DAYS = 4;
 
 export type RowStatus = 'new' | 'duplicate' | 'possible_duplicate' | 'transfer_match' | 'error';
-export type RowAction = 'create' | 'skip' | 'link' | 'merge_transfer';
+export type RowAction = 'create' | 'skip' | 'link' | 'merge_transfer' | 'move';
 
 export interface PreviewRow {
   index: number;
@@ -24,7 +24,9 @@ export interface PreviewRow {
   status: RowStatus;
   error?: string;
   /** Existing transaction this row duplicates / should link to / pairs with. */
-  match?: { transactionId: number; postingId: number; date: string; description: string; accountName: string };
+  match?: { transactionId: number; postingId: number; date: string; description: string; accountName: string;
+    /** 'move': a payment from your bank filed to another card; this row says it was this one. */
+    fromAccountName?: string };
   action: RowAction;
   kind: Kind;
   categoryId: number | null;
@@ -137,6 +139,30 @@ export function previewImport(db: DB, input: PreviewInput): PreviewResult {
       continue;
     }
 
+    // 2b. A card payment ("PAYMENT RECEIVED") your bank statement already recorded, but filed to a different card
+    //     (both Amex cards look the same on a bank statement). Offer to move it here instead of recording it twice.
+    if (r.amount > 0 && isLiability(account.type)) {
+      const wrong = db.prepare(
+        `SELECT p.id AS posting_id, t.id, t.date, t.description, a.name AS account_name, oa.name AS from_name
+         FROM postings p JOIN transactions t ON t.id = p.transaction_id JOIN accounts a ON a.id = p.account_id
+         JOIN postings o ON o.transaction_id = t.id AND o.id != p.id AND o.import_hash IS NOT NULL
+         JOIN accounts oa ON oa.id = o.account_id
+         WHERE t.kind = 'transfer' AND p.account_id != ? AND p.amount = ? AND p.import_hash IS NULL
+           AND a.type IN ('credit_card','loan','other_liability') AND t.date BETWEEN ? AND ?
+           AND (SELECT COUNT(*) FROM postings x WHERE x.transaction_id = t.id) = 2
+         ORDER BY ABS(julianday(t.date) - julianday(?)) LIMIT 5`,
+      ).all(input.accountId, r.amount, addDays(r.date, -MATCH_WINDOW_DAYS - 1), addDays(r.date, MATCH_WINDOW_DAYS + 1), r.date) as any[];
+      const w = wrong.find((x) => !usedPostings.has(x.posting_id));
+      if (w) {
+        usedPostings.add(w.posting_id);
+        rows.push({
+          ...base, hash, status: 'possible_duplicate', action: 'move', kind: 'transfer', categoryId: null, transferAccountId: null, suggestionSource: 'match',
+          match: { transactionId: w.id, postingId: w.posting_id, date: w.date, description: w.description, accountName: w.account_name, fromAccountName: w.from_name },
+        });
+        continue;
+      }
+    }
+
     // 3. Other side of a transfer already recorded on another account
     //    (e.g. the card's "PAYMENT RECEIVED" ↔ the current account's card-payment debit).
     const counter = db
@@ -148,7 +174,7 @@ export function previewImport(db: DB, input: PreviewInput): PreviewResult {
          ORDER BY ABS(julianday(t.date) - julianday(?)) LIMIT 5`,
       )
       .all(input.accountId, -r.amount, addDays(r.date, -MATCH_WINDOW_DAYS), addDays(r.date, MATCH_WINDOW_DAYS), r.date) as any[];
-    const sugg = suggest(db, rules, input.accountId, r.description, r.amount);
+    const sugg = suggest(db, rules, input.accountId, r.description, r.amount, r.date);
     const c = counter.find((x) => !usedPostings.has(x.posting_id) && looksLikeTransfer(r, sugg.kind, account, x));
     if (c) {
       usedPostings.add(c.posting_id);
@@ -161,7 +187,8 @@ export function previewImport(db: DB, input: PreviewInput): PreviewResult {
 
     // 4. New transaction.
     let { kind, categoryId, transferAccountId, source } = { ...sugg, source: sugg.source as PreviewRow['suggestionSource'] };
-    if (source === 'none') {
+    // (A transfer with no account means past payments went to more than one account: ask, don't guess.)
+    if (source === 'none' && !(kind === 'transfer' && transferAccountId == null)) {
       const hinted = transferHint(r.description, r.amount, account, otherAccounts);
       if (hinted !== undefined) {
         kind = 'transfer';
@@ -316,6 +343,20 @@ export function commitImport(db: DB, input: CommitInput) {
           .get(row.matchPostingId ?? -1, input.accountId, row.amount);
         if (!p) throw new ValidationError(`Row ${row.index + 1}: the matching transaction changed — preview again`);
         db.prepare('UPDATE postings SET import_hash = ?, bank_description = ? WHERE id = ?').run(row.hash, row.bankDescription, row.matchPostingId!);
+        matched++;
+        continue;
+      }
+
+      if (row.action === 'move') {
+        // Move the payment from the card it was filed to onto this one, and mark it as imported here.
+        const p = db.prepare(
+          `SELECT p.* FROM postings p JOIN accounts a ON a.id = p.account_id JOIN transactions t ON t.id = p.transaction_id
+           WHERE p.id = ? AND p.amount = ? AND p.import_hash IS NULL AND p.account_id != ? AND t.kind = 'transfer'
+             AND a.type IN ('credit_card','loan','other_liability')`,
+        ).get(row.matchPostingId ?? -1, row.amount, input.accountId);
+        if (!p) throw new ValidationError(`Row ${row.index + 1}: the matching payment changed — preview again`);
+        db.prepare('UPDATE postings SET account_id = ?, import_hash = ?, bank_description = ? WHERE id = ?')
+          .run(input.accountId, row.hash, row.bankDescription, row.matchPostingId!);
         matched++;
         continue;
       }

@@ -1845,3 +1845,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 .verdict-info .verdict-title { color: var(--info-text); }
 .verdict-warn .verdict-title { color: var(--warn-text); }
 .verdict-bad .verdict-title { color: var(--bad-text); }
+.doubled { border-color: var(--warn-text); }
+.doubled > .card-body > p, .doubled p { margin: 0 0 10px; }
+.doubled-list { list-style: none; margin: 0; padding: 0; }
+.doubled-list li { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); line-height: 1.45; }

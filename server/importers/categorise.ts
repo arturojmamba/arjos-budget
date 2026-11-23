@@ -56,7 +56,7 @@ export function ruleMatches(rule: RuleRow, description: string): boolean {
  *  2. how you categorised the same merchant last time,
  *  3. fall back to income/expense by sign, uncategorised.
  */
-export function suggest(db: DB, rules: RuleRow[], accountId: number, description: string, amount: number): Suggestion {
+export function suggest(db: DB, rules: RuleRow[], accountId: number, description: string, amount: number, date?: string | null): Suggestion {
   // Someone paying you back for a shared bill: a refund against that bill's category.
   const shared = shareCategoryFor(db, accountId, description, amount);
   if (shared) return { kind: 'expense', categoryId: shared, transferAccountId: null, description, source: 'rule' };
@@ -89,6 +89,22 @@ export function suggest(db: DB, rules: RuleRow[], accountId: number, description
       .get(accountId, merchant, accountId) as { kind: string; category_id: number | null; other_account: number | null } | undefined;
     if (prev) {
       if (prev.kind === 'transfer' && prev.other_account) {
+        // The same description has paid more than one account before (both Amex cards show as "AMERICAN EXPRESS"):
+        // pick the card whose payment is due around this date, or ask rather than guess.
+        const others = (db.prepare(
+          `SELECT DISTINCT p2.account_id AS id, d.due_day FROM transactions t JOIN postings p ON p.transaction_id = t.id
+           JOIN postings p2 ON p2.transaction_id = t.id AND p2.account_id != p.account_id
+           JOIN accounts a ON a.id = p2.account_id AND a.archived = 0
+           LEFT JOIN debts d ON d.account_id = p2.account_id
+           WHERE t.merchant = ? AND p.account_id = ? AND t.kind = 'transfer'`,
+        ).all(merchant, accountId) as { id: number; due_day: number | null }[]);
+        if (others.length > 1) {
+          const day = date ? Number(date.slice(8, 10)) : null;
+          const near = (d: number | null) => (day == null || d == null ? 99 : Math.min(Math.abs(day - d), 31 - Math.abs(day - d)));
+          const close = others.filter((o) => near(o.due_day) <= 3);
+          if (close.length === 1) return { kind: 'transfer', categoryId: null, transferAccountId: close[0].id, description, source: 'history' };
+          return { kind: 'transfer', categoryId: null, transferAccountId: null, description, source: 'none' };
+        }
         return { kind: 'transfer', categoryId: null, transferAccountId: prev.other_account, description, source: 'history' };
       }
       if (prev.category_id) {

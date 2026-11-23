@@ -319,6 +319,8 @@ export function deleteDebtDetails(db: DB, accountId: number) {
 export interface Statement {
   from: string; to: string; current: boolean;
   purchases: number; refunds: number; interest: number; payments: number;
+  /** Of `payments`, those made by the previous statement's due date: they pay that statement, not this one. */
+  paidForPrevious: number;
   /** Owed when the statement closed (or now, for the open one). */
   closing: number;
 }
@@ -334,7 +336,7 @@ function dayAfter(iso: string): string {
 }
 
 /** The open statement plus the last `count` closed ones, newest first. */
-export function statements(db: DB, accountId: number, day: number, today = todayIso(), count = 6): Statement[] {
+export function statements(db: DB, accountId: number, day: number, today = todayIso(), count = 6, dueDay: number | null = null): Statement[] {
   let m = monthOf(today);
   if (closeIn(m, day) >= today) m = addMonths(m, -1); // latest close strictly before today
   const closes = Array.from({ length: count + 1 }, (_, i) => closeIn(addMonths(m, -i), day)); // newest first
@@ -352,11 +354,24 @@ export function statements(db: DB, accountId: number, day: number, today = today
      LEFT JOIN categories c ON c.id = p.category_id LEFT JOIN categories pc ON pc.id = c.parent_id
      WHERE p.account_id = ? AND t.date BETWEEN ? AND ?`,
   );
+  const paidIn = db.prepare(
+    `SELECT IFNULL(SUM(p.amount), 0) AS n FROM postings p JOIN transactions t ON t.id = p.transaction_id
+     WHERE p.account_id = ? AND t.kind = 'transfer' AND p.amount > 0 AND t.date BETWEEN ? AND ?`,
+  );
   return periods.map((p) => {
     const r = sums.get(accountId, p.from, p.to) as { purchases: number; refunds: number; interest: number; payments: number };
     const asOf = p.current ? today : p.to;
     const acc = listAccounts(db, { asOf, includeArchived: true }).find((a) => a.id === accountId);
-    return { ...p, ...r, closing: acc ? Math.max(0, -acc.balance) : 0 };
+    // The previous statement is due on the first due day after it closed (the day before this one starts).
+    let paidForPrevious = 0;
+    if (dueDay) {
+      let m = monthOf(p.from);
+      if (closeIn(m, dueDay) < p.from) m = addMonths(m, 1);
+      // A few days' grace: a direct debit due on a Sunday leaves the bank on Monday or Tuesday.
+      const due = new Date(`${closeIn(m, dueDay)}T12:00:00Z`); due.setUTCDate(due.getUTCDate() + 3);
+      paidForPrevious = Math.min(r.payments, (paidIn.get(accountId, p.from, due.toISOString().slice(0, 10)) as { n: number }).n);
+    }
+    return { ...p, ...r, paidForPrevious, closing: acc ? Math.max(0, -acc.balance) : 0 };
   });
 }
 
@@ -517,7 +532,7 @@ export function listDebts(db: DB, today = todayIso()) {
       const schedule = d.debt_type === 'pay_in_3' ? payInSchedule(d, owed) : null;
       const nextInstalment = schedule?.find((s) => !s.paid) ?? null;
       // Cards with a statement date: what's due is the last statement's balance less what you've paid since it closed.
-      const stmts = d.statement_day && d.debt_type === 'credit_card' ? statements(db, a.id, d.statement_day, today) : null;
+      const stmts = d.statement_day && d.debt_type === 'credit_card' ? statements(db, a.id, d.statement_day, today, 6, d.due_day) : null;
       const lastStatement = stmts?.find((x) => !x.current) ?? null;
       const statementDue = lastStatement ? Math.max(0, lastStatement.closing - stmts![0].payments) : null;
       const minimum = schedule ? nextInstalment?.outstanding ?? 0

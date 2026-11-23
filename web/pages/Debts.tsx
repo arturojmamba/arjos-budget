@@ -7,7 +7,7 @@ import { navigate } from '../router.ts';
 
 type DebtType = 'credit_card' | 'pay_in_3' | 'personal_loan' | 'student_loan' | 'bnpl' | 'car_finance' | 'overdraft' | 'personal' | 'other';
 type Strategy = 'minimum' | 'snowball' | 'avalanche';
-interface Statement { from: string; to: string; current: boolean; purchases: number; refunds: number; interest: number; payments: number; closing: number }
+interface Statement { from: string; to: string; current: boolean; purchases: number; refunds: number; interest: number; payments: number; paidForPrevious: number; closing: number }
 
 interface Details {
   debtType: DebtType; originalBalance: number; apr: number; promoApr: number | null; promoEnd: string | null; rateNow: number;
@@ -57,6 +57,7 @@ export function Debts() {
 
   return (
     <div className="page">
+      <DoubledPayments />
       <div className="stats">
         <Stat label="Total owed" value={<Money value={totals.owed} />} tone={totals.owed > 0 ? 'bad' : undefined}
           sub={totals.interestNext > 0 ? `About ${money(totals.interestNext)} interest next month` : 'No interest being charged'} />
@@ -372,6 +373,9 @@ function Statements({ accountId, list, due, nextDue }: { accountId: number; list
   const last = list.find((s) => !s.current);
   const view = (s: Statement) => navigate(`/transactions${qs({ accountId, from: s.from, to: s.to })}`);
   const range = (s: Statement) => `${shortDate(s.from)} – ${shortDate(s.to)}`;
+  // Payments made by the last statement's due date pay that statement; anything after counts towards this one.
+  const forLast = last ? cur.paidForPrevious : 0;
+  const forThis = cur.payments - forLast;
   return (
     <div className="statements">
       <div className="stmt-now">
@@ -379,14 +383,17 @@ function Statements({ accountId, list, due, nextDue }: { accountId: number; list
           <div className="stmt-box">
             <span className="muted small">Last statement · {range(last)}</span>
             <span className="strong"><Money value={last.closing} /></span>
-            <span className="small">{due != null && due > 0 ? <>{money(due)} to pay{nextDue ? ` by ${shortDate(nextDue)}` : ''}</> : <span className="tone-good">Paid</span>}</span>
+            <span className="small">
+              {due != null && due > 0 ? <>{money(due)} to pay{nextDue ? ` by ${shortDate(nextDue)}` : ''}</> : <span className="tone-good">Paid</span>}
+              {forLast > 0 && <span className="muted"> · {money(forLast)} paid since it closed</span>}
+            </span>
             <button className="link-btn small" onClick={() => view(last)}>View transactions</button>
           </div>
         )}
         <div className="stmt-box">
           <span className="muted small">This statement · {range(cur)}</span>
           <span className="strong"><Money value={cur.purchases - cur.refunds} /> <span className="muted small" style={{ fontWeight: 500 }}>spent so far</span></span>
-          <span className="small muted">{cur.payments ? `${money(cur.payments)} paid in` : 'No payments yet'}</span>
+          <span className="small muted">{forThis > 0 ? `${money(forThis)} paid towards it` : 'No payments yet'}</span>
           <button className="link-btn small" onClick={() => view(cur)}>View transactions</button>
         </div>
       </div>
@@ -906,5 +913,42 @@ function PayoffPlanIfUseful({ hasDebts }: { hasDebts: boolean }) {
       {!show && <p className="muted small">None of your debts charge interest, so the order you pay them in doesn't change the cost.</p>}
       {show && <PayoffPlan hasDebts={hasDebts} />}
     </div>
+  );
+}
+
+interface Doubled { keepId: number; dropId: number; amount: number; bankAccount: string; bankDate: string; bankDescription: string; filedTo: string; paidTo: string; cardDate: string; guessedFrom: string }
+
+/** Card payments recorded twice (once from the bank statement, once from the card's): Coil finds them, you confirm. */
+function DoubledPayments() {
+  const { toast, refresh } = useApp();
+  const { data, reload } = useData<Doubled[]>(() => api.get('/api/card-payments/doubled'), []);
+  const [busy, setBusy] = useState(false);
+  if (!data?.length) return null;
+  async function fix(list: Doubled[]) {
+    setBusy(true);
+    try {
+      for (const d of list) await api.post('/api/card-payments/merge', { keepId: d.keepId, dropId: d.dropId });
+      toast(list.length === 1 ? 'Payment sorted out' : `${list.length} payments sorted out`);
+      reload(); refresh();
+    } catch (e: any) { toast(e.message, 'error'); } finally { setBusy(false); }
+  }
+  return (
+    <Card title={`${data.length} card payment${data.length === 1 ? '' : 's'} recorded twice`} className="doubled"
+      action={data.length > 1 ? <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => fix(data)}>Fix all {data.length}</button> : undefined}>
+      <p className="muted small">Each was recorded once from your bank statement and again from the card's statement. Fixing keeps your bank's payment, files it to the card whose statement shows it, and removes the copy.</p>
+      <ul className="doubled-list">
+        {data.map((d) => (
+          <li key={d.keepId}>
+            <span>
+              <strong>{money(d.amount)}</strong> from {d.bankAccount} on {shortDate(d.bankDate)}
+              {d.filedTo !== d.paidTo
+                ? <> is filed to <strong>{d.filedTo}</strong>, but {d.paidTo}'s statement shows it ({shortDate(d.cardDate)}).</>
+                : <>, and again on {d.paidTo}'s statement as if from {d.guessedFrom}.</>}
+            </span>
+            <button className="btn btn-sm" disabled={busy} onClick={() => fix([d])}>Fix</button>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }

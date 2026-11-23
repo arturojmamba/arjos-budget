@@ -190,6 +190,8 @@ test('linking payments to a debt turns spending into repayments', () => {
   const northbank = acc('Northbank Current');
   const id = createDebt(db, { name: 'PayPal raincoat', debtType: 'pay_in_3', originalBalance: 23800, paidSoFar: 0, instalments: 3, startDate: '2026-10-21', apr: 0, minType: 'fixed' } as any);
   const other = createDebt(db, { name: 'Old duplicate', debtType: 'personal_loan', originalBalance: 23800, owed: 23800, apr: 0, minType: 'fixed', minFixed: 7933 } as any);
+  // The balances were confirmed before these payments (the tests don't depend on today's date).
+  db.prepare("UPDATE accounts SET anchor_date = '2026-10-01' WHERE id IN (?, ?)").run(id, other);
   const spend = createTransaction(db, simpleToPostings({ kind: 'expense', date: '2026-11-21', description: 'PAYPAL *PAYIN3', accountId: northbank, categoryId: cat('Shopping'), amount: 7934 }));
   const wrong = createTransaction(db, simpleToPostings({ kind: 'transfer', date: '2026-12-21', description: 'PAYPAL', accountId: northbank, toAccountId: other, amount: 7933 }));
   const cands = linkCandidates(db, id, 'paypal', '2026-12-30');
@@ -237,6 +239,7 @@ test('timeline: when each debt is cleared, debt-free date and archiving', () => 
   db.prepare("INSERT INTO recurring (name, type, amount, frequency, start_date, end_date, account_id, transfer_account_id) VALUES ('Ticket', 'saving', 20000, 'monthly', '2026-11-30', '2026-11-30', ?, ?)").run(northbank, ticket);
   db.prepare("INSERT INTO recurring (name, type, amount, frequency, start_date, end_date, account_id, transfer_account_id) VALUES ('Ticket final', 'saving', 6246, 'annually', '2026-12-30', '2026-12-30', ?, ?)").run(northbank, ticket);
   const jacket = createDebt(db, { name: 'Raincoat', debtType: 'pay_in_3', originalBalance: 23800, paidSoFar: 7934, instalments: 3, startDate: '2026-10-21', apr: 0, minType: 'fixed' } as any);
+  db.prepare("UPDATE accounts SET anchor_date = '2026-11-12' WHERE id IN (?, ?)").run(ticket, jacket);
   const t = debtTimeline(db, '2026-11-12');
   const byName = Object.fromEntries(t.debts.map((d) => [d.name, d]));
   assert.equal(byName['Concert ticket'].source, 'bills');

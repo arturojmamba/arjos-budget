@@ -35,6 +35,7 @@ import { portfolio, holdingDetail } from './investing.ts';
 import { isaStatus, isaAllowanceSummary } from './isa.ts';
 import { setEarlierYearTransfer } from './contributions.ts';
 import { payCycle } from './paycycle.ts';
+import { findDoubledPayments, mergeDoubledPayment } from './cardpayments.ts';
 import { loadContext, simulate as simulatePurchase, type Context as AffordContext } from './afford.ts';
 import { validateInput, listPlans, getPlan, createPlan, updatePlan, setPlanStatus, deletePlan, confirmPurchase } from './purchases.ts';
 import { backupAndCopy, copyFolder, lastCopy, setCopyFolder, iCloudDrive, ICLOUD_SUBFOLDER } from './backupcopy.ts';
@@ -438,6 +439,8 @@ function affordContext(db: DB): AffordContext {
   affordCache.set(db, { at: Date.now(), ctx });
   return ctx;
 }
+route('GET', '/api/card-payments/doubled', ({ db }) => findDoubledPayments(db));
+route('POST', '/api/card-payments/merge', ({ db, body }) => { mergeDoubledPayment(db, Number(body?.keepId), Number(body?.dropId)); return { ok: true }; });
 route('GET', '/api/afford/context', ({ db }) => {
   affordCache.delete(db);
   const c = affordContext(db);

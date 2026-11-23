@@ -3,6 +3,17 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.18.1",
+    "date": "2026-11-23",
+    "changes": [
+      "Card payments recorded twice (once from your bank, once from the card's statement, sometimes filed to the wrong card) are listed on Debts with a Fix button",
+      "Importing a card statement now spots a payment your bank statement filed to another card and offers to move it, instead of recording it again",
+      "When a bank description has paid more than one card (both Amex cards look the same), the import picks the card due around that date, or asks",
+      "A payment made by a card's due date now counts towards the statement it pays, not the next one",
+      "Data health flags a card payment that isn't on that card's own statement"
+    ]
+  },
+  {
     "version": "1.18.0",
     "date": "2026-11-19",
     "changes": [

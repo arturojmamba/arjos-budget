@@ -9,6 +9,7 @@ import { uncountedRepayments } from './debts.ts';
 import { uninvestedCash } from './t212.ts';
 import { syncedAccounts } from './investments.ts';
 import { formatPence } from './money.ts';
+import { findDoubledPayments, notOnCardStatement } from './cardpayments.ts';
 
 export interface HealthIssue {
   id: string;
@@ -55,6 +56,12 @@ export function healthChecks(db: DB, today = todayIso()): HealthIssue[] {
        AND (lower(t1.merchant) = lower(t2.merchant) OR lower(t1.description) = lower(t2.description))`,
   ).get(addDays(today, -120)) as { n: number }).n;
   if (dupTx > 0) out.push({ id: 'dup-tx', level: 'warn', title: `${dupTx} possible duplicate transaction${dupTx === 1 ? '' : 's'}`, detail: 'Same account, amount and name within a day, where at least one was added by hand. Check and delete the extra one.', link: '/transactions?month=all', linkLabel: 'Transactions' });
+
+  const doubled = findDoubledPayments(db);
+  if (doubled.length) out.push({ id: 'card-doubled', level: 'warn', title: `${doubled.length} card payment${doubled.length === 1 ? '' : 's'} recorded twice`, detail: 'Once from your bank statement and again from the card\'s. Debts lists them with a Fix button.', link: '/debts', linkLabel: 'Debts' });
+  for (const n of notOnCardStatement(db).slice(0, 3)) {
+    out.push({ id: `card-missing-${n.txId}`, level: 'warn', title: `${formatPence(n.amount)} paid to ${n.card} on ${n.date} isn't on its statement`, detail: `It came from ${n.from}, but ${n.card}'s statement doesn't show it. It may belong to another card: open it and change the account.`, link: `/transactions?accountId=${n.cardId}&from=${n.date}&to=${n.date}`, linkLabel: 'Transactions' });
+  }
 
   const overdue = occurrences(db, addDays(today, -45), today).filter((o) => o.status === 'overdue');
   if (overdue.length) out.push({ id: 'overdue', level: 'warn', title: `${overdue.length} bill${overdue.length === 1 ? '' : 's'} marked overdue`, detail: `${overdue.slice(0, 3).map((o) => o.name).join(', ')}${overdue.length > 3 ? '…' : ''}. If they were paid under a different name, mark them paid so they stop counting as still to pay.`, link: '/bills', linkLabel: 'Bills' });

@@ -6,12 +6,12 @@ import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 
 type Kind = 'expense' | 'income' | 'transfer';
-type Action = 'create' | 'skip' | 'link' | 'merge_transfer';
+type Action = 'create' | 'skip' | 'link' | 'merge_transfer' | 'move';
 interface Mapping { date: string; dateFormat?: 'DMY' | 'YMD' | 'MDY'; description: string[]; amount?: string; invert?: boolean; debit?: string; credit?: string; balance?: string }
 interface Row {
   index: number; date: string | null; description: string; bankDescription: string; amount: number | null; balance: number | null; hash: string | null;
   status: 'new' | 'duplicate' | 'possible_duplicate' | 'transfer_match' | 'error'; error?: string;
-  match?: { transactionId: number; postingId: number; date: string; description: string; accountName: string };
+  match?: { transactionId: number; postingId: number; date: string; description: string; accountName: string; fromAccountName?: string };
   action: Action; kind: Kind; categoryId: number | null; transferAccountId: number | null; suggestionSource: string; smartMatch?: string; remember?: boolean;
   /** Category copied from the row with this index (same place). Changing that row again updates this one too. */
   filledFrom?: number | null;
@@ -284,7 +284,15 @@ function ImportRow({ r, accountId, onChange, source }: { r: Row; accountId: numb
       <td className={`num nowrap ${r.amount! > 0 ? 'amt-in' : ''}`}>{r.amount! > 0 ? money(r.amount!, { sign: true }) : money(-r.amount!)}</td>
       <td>
         {r.status === 'duplicate' && <span className="muted small"><Icon name="check" size={14} /> Already imported</span>}
-        {r.status === 'possible_duplicate' && (
+        {r.status === 'possible_duplicate' && r.match?.fromAccountName && (
+          <div className="match">
+            <select value={r.action} onChange={(e) => onChange(r.index, { action: e.target.value as Action })}>
+              <option value="move">Same payment: move it to this card</option><option value="create">Import as new</option><option value="skip">Skip</option>
+            </select>
+            <span className="muted small"><Icon name="link" size={12} /> {r.match.fromAccountName} paid this on {shortDate(r.match.date)}, but it's filed to {r.match.accountName}</span>
+          </div>
+        )}
+        {r.status === 'possible_duplicate' && !r.match?.fromAccountName && (
           <div className="match">
             <select value={r.action} onChange={(e) => onChange(r.index, { action: e.target.value as Action })}>
               <option value="link">Link to existing</option><option value="create">Import as new</option><option value="skip">Skip</option>
