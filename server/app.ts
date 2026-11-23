@@ -27,7 +27,7 @@ import {
   createRecurring, updateRecurring, deleteRecurring, listRecurring, occurrences, setPayment, suggestRecurring, dismissSuggestion, autoMatch, FREQUENCIES,
 } from './recurring.ts';
 import { listBudgets, createBudget, updateBudget, deleteBudget, reorderBudgets, suggestBudgets, budgetCategoryIds, budgetAccount, budgetGuide, updateGuide } from './budgets.ts';
-import { listDebts, debtPlan, saveDebtPlan, saveDebt, createDebt, deleteDebtDetails, linkCandidates, linkToDebt, reviewRepayments, debtTimeline, archiveDebt, addRepaymentToBills, DEBT_TYPES } from './debts.ts';
+import { listDebts, debtPlan, saveDebtPlan, saveDebt, createDebt, deleteDebtDetails, linkCandidates, linkToDebt, reviewRepayments, debtTimeline, archiveDebt, addRepaymentToBills, DEBT_TYPES, allLateArrivals } from './debts.ts';
 import { setValuation, deleteValuation, investmentHistory, trading212Config, syncedAccounts } from './investments.ts';
 import { resetTrading212, startSync, syncStatus, syncTrading212Full } from './t212.ts';
 import { saveShares } from './shares.ts';
@@ -363,6 +363,7 @@ route('GET', '/api/debts/:id/candidates', ({ db, params, query }) => linkCandida
 route('POST', '/api/debts/:id/link', ({ db, params, body }) => { linkToDebt(db, id(params), body?.transactionIds, { takeOff: body?.takeOff }); return { ok: true }; });
 route('GET', '/api/debts/timeline', ({ db }) => debtTimeline(db));
 route('POST', '/api/debts/:id/archive', ({ db, params }) => { archiveDebt(db, id(params)); return { ok: true }; });
+route('GET', '/api/accounts/late', ({ db }) => allLateArrivals(db));
 route('POST', '/api/debts/:id/review', ({ db, params, body }) => { reviewRepayments(db, id(params), body?.postingIds, !!body?.apply); return { ok: true }; });
 route('PUT', '/api/debts/:id', ({ db, params, body }) => { saveDebt(db, id(params), body); return { ok: true }; });
 route('DELETE', '/api/debts/:id', ({ db, params }) => { deleteDebtDetails(db, id(params)); return { ok: true }; });

@@ -39,7 +39,7 @@ export function Import() {
   const [filter, setFilter] = useState<'all' | 'attention' | 'new' | 'dupes'>('all');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ created: number; matched: number; skipped: number; rulesCreated: number } | null>(null);
+  const [result, setResult] = useState<{ created: number; matched: number; skipped: number; rulesCreated: number; late?: number; accountName?: string; accountType?: string } | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const account = accounts.find((a) => a.id === accountId);
@@ -121,7 +121,7 @@ export function Import() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.post<{ created: number; matched: number; skipped: number; rulesCreated: number }>('/api/import/commit', {
+      const res = await api.post<{ created: number; matched: number; skipped: number; rulesCreated: number; late?: number; accountName?: string; accountType?: string }>('/api/import/commit', {
         accountId, filename: file?.name, presetId: preview.presetId,
         anchor: useAnchor ? preview.anchor : null,
         rows: rows.filter((r) => r.status !== 'error' && r.date && r.amount !== null && r.hash).map((r) => ({
@@ -184,7 +184,8 @@ export function Import() {
             {result && (
               <div className="banner banner-good">
                 <Icon name="check" size={16} />
-                <span>Imported {result.created} new transactions, linked {result.matched} to existing ones, skipped {result.skipped}.{result.rulesCreated ? ` Created ${result.rulesCreated} rules.` : ''}</span>
+                <span>Imported {result.created} new transactions, linked {result.matched} to existing ones, skipped {result.skipped}.{result.rulesCreated ? ` Created ${result.rulesCreated} rules.` : ''}
+                  {result.late ? <> {result.late} {result.late === 1 ? 'is' : 'are'} dated before the balance you confirmed for {result.accountName}: <a href={result.accountType === 'credit_card' || result.accountType === 'loan' ? '#/debts' : '#/accounts'}>check whether {result.late === 1 ? 'it was' : 'they were'} included</a>.</> : null}</span>
                 <button className="link-btn" onClick={() => navigate('/transactions')}>View transactions</button>
               </div>
             )}

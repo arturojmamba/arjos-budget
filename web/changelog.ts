@@ -3,6 +3,15 @@ export interface Release { version: string; date: string; changes: string[] }
 
 export const RELEASES: Release[] = [
   {
+    "version": "1.18.2",
+    "date": "2026-11-23",
+    "changes": [
+      "Transactions that turn up after you confirmed a balance but are dated before it (usually card charges that were still pending) are now asked about, instead of quietly left out",
+      "Count them or say they were already included, from the card on Debts or from Accounts; the import tells you when there are some to check",
+      "Data health lists any accounts waiting for that decision"
+    ]
+  },
+  {
     "version": "1.18.1",
     "date": "2026-11-23",
     "changes": [

@@ -3,6 +3,7 @@ import { api, qs } from '../api.ts';
 import { addMonths, money, monthLabel, parseAmount, penceToInput, pct, shortDate } from '../format.ts';
 import { AccountSelect, Badge, Card, Empty, Field, Modal, Money, Progress, Segmented, Stat, useApp, useConfirm, useData, usePageAdd } from '../components/ui.tsx';
 import { Icon } from '../components/Icon.tsx';
+import { LateArrivals } from '../components/LateArrivals.tsx';
 import { navigate } from '../router.ts';
 
 type DebtType = 'credit_card' | 'pay_in_3' | 'personal_loan' | 'student_loan' | 'bnpl' | 'car_finance' | 'overdraft' | 'personal' | 'other';
@@ -253,31 +254,7 @@ function DebtCard({ d, onEdit }: { d: DebtItem; onEdit: () => void }) {
  * The app can't tell whether your figure already allowed for them, so it asks.
  */
 function Uncounted({ d }: { d: DebtItem }) {
-  const { refresh, toast } = useApp();
-  if (!d.uncounted.length) return null;
-  const total = d.uncounted.reduce((s, u) => s + u.amount, 0);
-  const one = d.uncounted.length === 1;
-  async function review(apply: boolean) {
-    try {
-      await api.post(`/api/debts/${d.accountId}/review`, { postingIds: d.uncounted.map((u) => u.postingId), apply });
-      toast(apply ? `Took ${money(total)} off ${d.name}` : 'Left the balance as it is');
-      refresh();
-    } catch (e: any) { toast(e.message, 'error'); }
-  }
-  return (
-    <div className="uncounted">
-      <p className="small">
-        <strong>{one ? `${money(total)} repayment on ${shortDate(d.uncounted[0].date)}` : `${d.uncounted.length} repayments (${money(total)})`}</strong>{' '}
-        {one && d.uncounted[0].date === d.balanceCheck.confirmedOn ? 'is from the same day you set the amount owed' : `${one ? 'is' : 'are'} from before ${shortDate(d.balanceCheck.confirmedOn)}, when you set the amount owed`}, so {one ? "it hasn't" : "they haven't"} been taken off yet.
-        Should {one ? 'it' : 'they'} come off {money(d.owed)}?
-      </p>
-      {!one && <ul className="small muted">{d.uncounted.map((u) => <li key={u.postingId}>{shortDate(u.date)} · {u.description} · {money(u.amount)}</li>)}</ul>}
-      <div className="row gap">
-        <button className="btn btn-sm btn-primary" onClick={() => review(true)}>Take {money(total)} off</button>
-        <button className="btn btn-sm" onClick={() => review(false)}>No, it was already included</button>
-      </div>
-    </div>
-  );
+  return <LateArrivals accountId={d.accountId} name={d.name} isLiability confirmedOn={d.balanceCheck.confirmedOn} items={d.uncounted} />;
 }
 
 /** Shows how "owed" is worked out, so it's clear why a purchase did or didn't change it. */

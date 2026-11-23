@@ -7,6 +7,7 @@ import { parseCsv } from './csv.ts';
 import { PRESETS, applyMapping, detectPreset, findHeaderRow, guessMapping, type Mapping, type RawRow } from './presets.ts';
 import { loadRules, suggest } from './categorise.ts';
 import { smartCategory } from './smart.ts';
+import { lateArrivals } from '../debts.ts';
 
 const MATCH_WINDOW_DAYS = 4;
 
@@ -418,7 +419,9 @@ export function commitImport(db: DB, input: CommitInput) {
     }
 
     db.prepare('UPDATE import_batches SET created_count = ?, matched_count = ?, skipped_count = ? WHERE id = ?').run(created, matched, skipped, batchId);
-    return { batchId, created, matched, skipped, rulesCreated };
+    // Anything dated on or before a balance you confirmed earlier: ask whether that balance already had it.
+    const late = lateArrivals(db, input.accountId).length;
+    return { batchId, created, matched, skipped, rulesCreated, late, accountName: account.name, accountType: account.type };
   });
 }
 

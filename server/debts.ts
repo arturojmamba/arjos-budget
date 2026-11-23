@@ -246,36 +246,68 @@ export function linkCandidates(db: DB, debtId: number, search = '', today = toda
  * Cards are left out: their balance comes from statements, which already include payments.
  */
 export function uncountedRepayments(db: DB, debtId: number) {
-  const a = db.prepare('SELECT type, anchor_date, anchor_set_at FROM accounts WHERE id = ?').get(debtId) as { type: string; anchor_date: string; anchor_set_at: string | null } | undefined;
-  if (!a || !['loan', 'other_liability'].includes(a.type) || !a.anchor_set_at) return [];
-  return (db.prepare(
-    `SELECT p.id AS posting_id, t.id AS transaction_id, t.date, t.description, p.amount FROM postings p JOIN transactions t ON t.id = p.transaction_id
-     WHERE p.account_id = ? AND t.kind = 'transfer' AND p.amount > 0 AND t.date <= ? AND t.updated_at > ?
-       AND NOT EXISTS (SELECT 1 FROM debt_reviewed r WHERE r.posting_id = p.id)
-     ORDER BY t.date`,
-  ).all(debtId, a.anchor_date, a.anchor_set_at) as any[]).map((r) => ({ postingId: r.posting_id, transactionId: r.transaction_id, date: r.date, description: r.description, amount: r.amount }));
+  return lateArrivals(db, debtId);
 }
 
-/** Take repayments off the confirmed balance (apply) or mark them as already included. */
-export function reviewRepayments(db: DB, debtId: number, postingIds: number[], apply: boolean) {
-  if (!Array.isArray(postingIds) || !postingIds.length) throw new ValidationError('Choose a repayment');
+/**
+ * Transactions that arrived after you confirmed an account's balance but are dated on or before it.
+ * Coil assumes anything dated by then is already in the balance you gave, which is wrong when the
+ * figure you copied left out pending card charges (they turn up days later, dated earlier).
+ * You decide: count them (the confirmed balance moves by their amount) or leave them as included.
+ *   - Loans and other debts: repayments (linking a payment counts, so "changed since").
+ *   - Every other account (cards, bank, savings): anything added on a later day than you confirmed it.
+ *     (Statements imported the same day you set a balance match it: that's how you start.)
+ * Investments are left out: their balance comes from the broker.
+ */
+/**
+ * Only the days just before a confirmed balance: pending charges land within a week or so. Older history
+ * imported after you set a balance (the usual way to start) is history, not a question.
+ */
+const LATE_WINDOW_DAYS = 10;
+
+export function lateArrivals(db: DB, accountId: number) {
+  const a = db.prepare('SELECT type, anchor_date, anchor_set_at, sync_provider FROM accounts WHERE id = ?').get(accountId) as
+    { type: string; anchor_date: string; anchor_set_at: string | null; sync_provider: string | null } | undefined;
+  if (!a || !a.anchor_set_at || a.type === 'investment' || a.sync_provider) return [];
+  const loan = ['loan', 'other_liability'].includes(a.type);
+  return (db.prepare(
+    `SELECT p.id AS posting_id, t.id AS transaction_id, t.date, t.description, p.amount FROM postings p JOIN transactions t ON t.id = p.transaction_id
+     WHERE p.account_id = ? AND t.date <= ?
+       AND ${loan ? "t.kind = 'transfer' AND p.amount > 0 AND t.updated_at > ?" : `date(t.created_at) > date(?) AND t.date >= date(?, '-${LATE_WINDOW_DAYS} days')`}
+       AND NOT EXISTS (SELECT 1 FROM debt_reviewed r WHERE r.posting_id = p.id)
+     ORDER BY t.date, t.id`,
+  ).all(...(loan ? [accountId, a.anchor_date, a.anchor_set_at] : [accountId, a.anchor_date, a.anchor_set_at, a.anchor_date])) as any[]).map((r) => ({ postingId: r.posting_id, transactionId: r.transaction_id, date: r.date, description: r.description, amount: r.amount }));
+}
+
+/** Count late arrivals in the confirmed balance (apply) or mark them as already included. */
+export function reviewRepayments(db: DB, accountId: number, postingIds: number[], apply: boolean) {
+  if (!Array.isArray(postingIds) || !postingIds.length) throw new ValidationError('Choose a transaction');
   tx(db, () => {
-    const a = db.prepare('SELECT anchor_balance, anchor_set_at FROM accounts WHERE id = ?').get(debtId) as { anchor_balance: number; anchor_set_at: string } | undefined;
-    if (!a) throw new ValidationError('Debt not found');
+    const a = db.prepare('SELECT type, anchor_balance, anchor_set_at FROM accounts WHERE id = ?').get(accountId) as { type: string; anchor_balance: number; anchor_set_at: string } | undefined;
+    if (!a) throw new ValidationError('Account not found');
     let total = 0;
     for (const pid of postingIds) {
-      const p = db.prepare('SELECT amount FROM postings WHERE id = ? AND account_id = ?').get(pid, debtId) as { amount: number } | undefined;
-      if (!p) throw new ValidationError('Repayment not found');
+      const p = db.prepare('SELECT amount FROM postings WHERE id = ? AND account_id = ?').get(pid, accountId) as { amount: number } | undefined;
+      if (!p) throw new ValidationError('Transaction not found');
       if (db.prepare('SELECT 1 FROM debt_reviewed WHERE posting_id = ?').get(pid)) continue;
       db.prepare('INSERT INTO debt_reviewed (posting_id, applied) VALUES (?, ?)').run(pid, apply ? 1 : 0);
       total += p.amount;
     }
     if (apply && total) {
-      db.prepare('UPDATE accounts SET anchor_balance = ? WHERE id = ?').run(Math.min(0, a.anchor_balance + total), debtId);
-      // Keep the original "confirmed at" time so other repayments still show up for review.
-      db.prepare('UPDATE accounts SET anchor_set_at = ? WHERE id = ?').run(a.anchor_set_at, debtId);
+      const loan = ['loan', 'other_liability'].includes(a.type);
+      db.prepare('UPDATE accounts SET anchor_balance = ? WHERE id = ?').run(loan ? Math.min(0, a.anchor_balance + total) : a.anchor_balance + total, accountId);
+      // Keep the original "confirmed at" time so anything else that came in late still shows up for review.
+      db.prepare('UPDATE accounts SET anchor_set_at = ? WHERE id = ?').run(a.anchor_set_at, accountId);
     }
   });
+}
+
+/** Every account with late arrivals waiting for a decision. */
+export function allLateArrivals(db: DB) {
+  const accts = db.prepare("SELECT id, name, type, anchor_date, anchor_balance FROM accounts WHERE archived = 0 AND type != 'investment' AND sync_provider IS NULL ORDER BY sort_order, name")
+    .all() as { id: number; name: string; type: string; anchor_date: string; anchor_balance: number }[];
+  return accts.map((a) => ({ accountId: a.id, name: a.name, type: a.type, confirmedOn: a.anchor_date, confirmedBalance: a.anchor_balance, items: lateArrivals(db, a.id) }))
+    .filter((a) => a.items.length);
 }
 
 /** Turn payments into repayments of this debt: they become transfers, so they're no longer counted as spending. */

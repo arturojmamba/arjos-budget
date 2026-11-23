@@ -5,7 +5,7 @@
 import { type DB } from './db.ts';
 import { addDays, todayIso } from './dates.ts';
 import { occurrences } from './recurring.ts';
-import { uncountedRepayments } from './debts.ts';
+import { uncountedRepayments, allLateArrivals } from './debts.ts';
 import { uninvestedCash } from './t212.ts';
 import { syncedAccounts } from './investments.ts';
 import { formatPence } from './money.ts';
@@ -56,6 +56,11 @@ export function healthChecks(db: DB, today = todayIso()): HealthIssue[] {
        AND (lower(t1.merchant) = lower(t2.merchant) OR lower(t1.description) = lower(t2.description))`,
   ).get(addDays(today, -120)) as { n: number }).n;
   if (dupTx > 0) out.push({ id: 'dup-tx', level: 'warn', title: `${dupTx} possible duplicate transaction${dupTx === 1 ? '' : 's'}`, detail: 'Same account, amount and name within a day, where at least one was added by hand. Check and delete the extra one.', link: '/transactions?month=all', linkLabel: 'Transactions' });
+
+  for (const a of allLateArrivals(db).filter((x) => !['loan', 'other_liability'].includes(x.type))) {
+    const total = a.items.reduce((s, i) => s + i.amount, 0);
+    out.push({ id: `late-${a.accountId}`, level: 'warn', title: `${a.name}: ${a.items.length} transaction${a.items.length === 1 ? '' : 's'} may be missing from its balance`, detail: `Dated on or before ${a.confirmedOn}, when you confirmed the balance, but added after (${formatPence(Math.abs(total))}). Choose whether that balance already included ${a.items.length === 1 ? 'it' : 'them'}.`, link: a.type === 'credit_card' ? '/debts' : '/accounts', linkLabel: a.type === 'credit_card' ? 'Debts' : 'Accounts' });
+  }
 
   const doubled = findDoubledPayments(db);
   if (doubled.length) out.push({ id: 'card-doubled', level: 'warn', title: `${doubled.length} card payment${doubled.length === 1 ? '' : 's'} recorded twice`, detail: 'Once from your bank statement and again from the card\'s. Debts lists them with a Fix button.', link: '/debts', linkLabel: 'Debts' });

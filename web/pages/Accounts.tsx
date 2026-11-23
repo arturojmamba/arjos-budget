@@ -6,6 +6,7 @@ import { ValueLine } from '../components/charts.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { navigate } from '../router.ts';
 import { useT212 } from '../components/T212.tsx';
+import { LateArrivals, type LateItem } from '../components/LateArrivals.tsx';
 
 const COLOURS = ['#006a4d', '#11b67a', '#2e77bb', '#5a9bd5', '#117aca', '#7433ff', '#e11d48', '#f97316', '#eab308', '#0ea5e9', '#14b8a6', '#64748b'];
 
@@ -33,6 +34,8 @@ export function Accounts() {
         <Stat label="What you owe" value={<Money value={-debts} />} tone={debts < 0 ? 'bad' : undefined} />
         <Stat label="Net worth" value={<Money value={assets + debts} />} />
       </div>
+
+      <LateOnAccounts />
 
       {groups.map((g) => g.items.length > 0 && (
         <Card key={g.title} title={g.title} pad={false}>
@@ -348,6 +351,18 @@ function ArchivedAccounts() {
           ))}
         </ul>
       ) : <p className="muted small" style={{ padding: '0 20px 16px' }}>Paid-off loans and closed accounts. They're left out of balances and lists but keep their history.</p>}
+    </Card>
+  );
+}
+
+/** Bank and savings accounts with transactions that may be missing from the balance you confirmed (cards are on Debts). */
+function LateOnAccounts() {
+  const { data } = useData<{ accountId: number; name: string; type: string; confirmedOn: string; items: LateItem[] }[]>(() => api.get('/api/accounts/late'), []);
+  const list = (data ?? []).filter((a) => !['credit_card', 'loan', 'other_liability'].includes(a.type));
+  if (!list.length) return null;
+  return (
+    <Card title="Check these balances">
+      {list.map((a) => <LateArrivals key={a.accountId} accountId={a.accountId} name={a.name} isLiability={false} confirmedOn={a.confirmedOn} items={a.items} />)}
     </Card>
   );
 }
